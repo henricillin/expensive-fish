@@ -1,0 +1,78 @@
+const CACHE_VERSION = "expense-tracker-v4";
+
+const PRECACHE_URLS = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./css/styles.css",
+  "./css/components.css",
+  "./js/app.js",
+  "./js/router.js",
+  "./js/db.js",
+  "./js/categories.js",
+  "./js/expenses.js",
+  "./js/budgets.js",
+  "./js/charts.js",
+  "./js/exportImport.js",
+  "./js/ui.js",
+  "./js/expenseModal.js",
+  "./js/categoryModal.js",
+  "./js/people.js",
+  "./js/settlements.js",
+  "./js/personModal.js",
+  "./js/splitModal.js",
+  "./js/settleModal.js",
+  "./js/views/home.js",
+  "./js/views/records.js",
+  "./js/views/summary.js",
+  "./js/views/more.js",
+  "./js/views/split.js",
+  "./js/vendor/chart.umd.min.js",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/maskable-192.png",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) =>
+        Promise.all(PRECACHE_URLS.map((url) => cache.add(new Request(url, { cache: "reload" }))))
+      )
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((names) => Promise.all(names.filter((n) => n !== CACHE_VERSION).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      });
+    })
+  );
+});

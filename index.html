@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>記帳小幫手</title>
+<meta name="theme-color" content="#ff6b35" />
+<meta name="description" content="簡單的手機記帳 App，記錄支出、依分類整理、查看月消費統計" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- Home: quick add -->
+  <section id="view-home" class="view">
+    <h1 class="page-title">記一筆</h1>
+
+    <div class="card">
+      <div class="amount-input-wrap">
+        <input id="home-amount" class="amount-input" type="number" inputmode="decimal" placeholder="$0" min="0" step="1" />
+      </div>
+      <div class="card-row">
+        <button type="button" class="btn btn-ghost" id="home-split-toggle">🧑‍🤝‍🧑 與人分帳</button>
+        <span id="home-split-summary" style="font-size:12px;color:var(--color-text-muted);"></span>
+      </div>
+      <div class="category-grid" id="home-category-grid"></div>
+      <div class="field">
+        <label for="home-date">日期</label>
+        <input id="home-date" type="date" />
+      </div>
+      <div class="field">
+        <label for="home-note">備註（選填）</label>
+        <input id="home-note" type="text" placeholder="午餐、飲料..." maxlength="60" />
+      </div>
+      <button id="home-save" class="btn btn-primary btn-block">儲存</button>
+    </div>
+
+    <div class="section-title">最近記錄</div>
+    <div id="home-recent-list"></div>
+  </section>
+
+  <!-- Records -->
+  <section id="view-records" class="view" hidden>
+    <h1 class="page-title">消費明細</h1>
+    <div class="filter-row">
+      <select id="records-month-filter"></select>
+      <select id="records-category-filter"></select>
+    </div>
+    <div id="records-list"></div>
+  </section>
+
+  <!-- Summary -->
+  <section id="view-summary" class="view" hidden>
+    <h1 class="page-title">月消費整理</h1>
+    <div class="month-switcher">
+      <button class="icon-btn" id="summary-prev-month" aria-label="上個月">◀</button>
+      <div class="month-label" id="summary-month-label"></div>
+      <button class="icon-btn" id="summary-next-month" aria-label="下個月">▶</button>
+    </div>
+
+    <div class="card" id="summary-total-card">
+      <div class="card-row">
+        <span>本月總支出</span>
+      </div>
+      <div class="total-spend" id="summary-total-amount">$0</div>
+      <div class="budget-row" id="summary-total-budget-row" hidden>
+        <div class="progress-track"><div class="progress-fill" id="summary-total-progress"></div></div>
+        <div class="card-row" id="summary-total-budget-label" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0">分類佔比</div>
+      <div class="chart-wrap"><canvas id="summary-pie"></canvas></div>
+      <div class="legend-list" id="summary-legend"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0">近 6 個月趨勢</div>
+      <div class="chart-wrap trend"><canvas id="summary-trend"></canvas></div>
+    </div>
+
+    <div class="card" id="summary-budgets-card">
+      <div class="section-title" style="margin-top:0">分類預算</div>
+      <div id="summary-budget-list"></div>
+    </div>
+
+    <div class="section-title">本月明細</div>
+    <div id="summary-list"></div>
+  </section>
+
+  <!-- More: categories + settings/backup -->
+  <section id="view-more" class="view" hidden>
+    <h1 class="page-title">更多</h1>
+
+    <div class="settings-section">
+      <div class="card-row" style="margin-bottom:10px;">
+        <span class="section-title" style="margin:0;">分類管理</span>
+        <button class="btn btn-ghost" id="more-add-category">+ 新增分類</button>
+      </div>
+      <div class="card" id="more-category-list"></div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-title" style="margin-top:0">多人分帳</div>
+      <a class="card card-row" href="#/split" style="text-decoration:none;color:inherit;">
+        <span>👥 分帳總覽</span>
+        <span class="icon-btn">›</span>
+      </a>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-title" style="margin-top:0">總預算</div>
+      <div class="card">
+        <div class="field" style="margin-bottom:0;">
+          <label for="more-total-budget">每月總預算（0 表示不設定）</label>
+          <input id="more-total-budget" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-title" style="margin-top:0">資料備份</div>
+      <div class="card">
+        <p class="settings-desc">資料只存在這台裝置的瀏覽器裡，建議定期匯出備份，換手機或清除瀏覽器資料前記得先匯出。</p>
+        <button class="btn btn-block" id="more-export-json" style="margin-bottom:8px;">匯出 JSON 備份</button>
+        <button class="btn btn-block" id="more-export-csv" style="margin-bottom:8px;">匯出 CSV（試算表用）</button>
+        <label class="btn btn-block" for="more-import-file" style="text-align:center; display:block;">匯入 JSON 備份還原</label>
+        <input type="file" id="more-import-file" accept="application/json" hidden />
+      </div>
+    </div>
+  </section>
+
+  <!-- Split overview (reached from More, no bottom tab) -->
+  <section id="view-split" class="view" hidden>
+    <div class="card-row" style="margin-bottom:10px;">
+      <a href="#/more" class="icon-btn" style="text-decoration:none;">‹ 返回</a>
+    </div>
+    <div class="card-row" style="margin-bottom:14px;">
+      <h1 class="page-title" style="margin-bottom:0;">分帳總覽</h1>
+      <button class="btn btn-ghost" id="split-add-person">+ 新增同伴</button>
+    </div>
+    <div id="split-balance-list"></div>
+  </section>
+
+  <nav class="tabbar">
+    <button class="tab-btn" data-route="/home" onclick="location.hash='/home'">
+      <span class="tab-icon">✏️</span><span>記一筆</span>
+    </button>
+    <button class="tab-btn" data-route="/records" onclick="location.hash='/records'">
+      <span class="tab-icon">🧾</span><span>明細</span>
+    </button>
+    <button class="tab-btn" data-route="/summary" onclick="location.hash='/summary'">
+      <span class="tab-icon">📊</span><span>月結算</span>
+      <span class="tab-dot" id="summary-tab-dot"></span>
+    </button>
+    <button class="tab-btn" data-route="/more" onclick="location.hash='/more'">
+      <span class="tab-icon">⚙️</span><span>更多</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Expense edit modal -->
+<div class="modal-backdrop" id="expense-modal" hidden>
+  <div class="modal-sheet">
+    <h2>編輯記錄</h2>
+    <p id="edit-split-note" class="settings-desc" hidden></p>
+    <div class="field">
+      <label for="edit-amount">金額</label>
+      <input id="edit-amount" type="number" inputmode="decimal" min="0" step="1" />
+    </div>
+    <div class="field">
+      <label for="edit-category">分類</label>
+      <select id="edit-category"></select>
+    </div>
+    <div class="field">
+      <label for="edit-date">日期</label>
+      <input id="edit-date" type="date" />
+    </div>
+    <div class="field">
+      <label for="edit-note">備註</label>
+      <input id="edit-note" type="text" maxlength="60" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="edit-delete">刪除</button>
+      <button class="btn btn-primary" id="edit-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="edit-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Category edit modal -->
+<div class="modal-backdrop" id="category-modal" hidden>
+  <div class="modal-sheet">
+    <h2 id="category-modal-title">新增分類</h2>
+    <div class="field">
+      <label for="cat-name">名稱</label>
+      <input id="cat-name" type="text" maxlength="20" />
+    </div>
+    <div class="field">
+      <label>圖示</label>
+      <div class="emoji-picker" id="cat-emoji-picker"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="cat-delete" hidden>刪除</button>
+      <button class="btn btn-primary" id="cat-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="cat-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Split configuration modal -->
+<div class="modal-backdrop" id="split-modal" hidden>
+  <div class="modal-sheet">
+    <h2>與人分帳</h2>
+    <div class="field">
+      <label for="split-total">帳單總額</label>
+      <input id="split-total" type="number" inputmode="decimal" min="0" step="1" />
+    </div>
+    <div class="field">
+      <label for="split-payer">誰先付的錢</label>
+      <select id="split-payer"></select>
+    </div>
+    <div class="field">
+      <div class="card-row" style="margin-bottom:6px;">
+        <label style="margin:0;">分帳對象</label>
+        <button type="button" class="btn btn-ghost" id="split-modal-add-person" style="padding:4px 10px;font-size:13px;">+ 新增同伴</button>
+      </div>
+      <div id="split-participants"></div>
+    </div>
+    <div class="field">
+      <label>分帳方式</label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn method-btn selected" data-method="equal" style="flex:1;">平均分攤</button>
+        <button type="button" class="btn method-btn" data-method="custom" style="flex:1;">自訂金額</button>
+      </div>
+    </div>
+    <div class="card-row" id="split-summary" style="font-size:13px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="split-apply">套用</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="split-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Person add/edit modal -->
+<div class="modal-backdrop" id="person-modal" hidden>
+  <div class="modal-sheet">
+    <h2 id="person-modal-title">新增同伴</h2>
+    <div class="field">
+      <label for="person-name">名字</label>
+      <input id="person-name" type="text" maxlength="20" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="person-delete" hidden>刪除</button>
+      <button class="btn btn-primary" id="person-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="person-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Settle up modal -->
+<div class="modal-backdrop" id="settle-modal" hidden>
+  <div class="modal-sheet">
+    <h2 id="settle-modal-title">登記結清</h2>
+    <div class="field">
+      <label for="settle-amount">金額</label>
+      <input id="settle-amount" type="number" inputmode="decimal" min="0" step="1" />
+    </div>
+    <div class="field">
+      <label for="settle-direction">方向</label>
+      <select id="settle-direction">
+        <option value="receive">對方還我錢</option>
+        <option value="pay">我還對方錢</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="settle-date">日期</label>
+      <input id="settle-date" type="date" />
+    </div>
+    <div class="field">
+      <label for="settle-note">備註（選填）</label>
+      <input id="settle-note" type="text" maxlength="60" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="settle-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="settle-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/vendor/chart.umd.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
