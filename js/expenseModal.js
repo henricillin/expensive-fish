@@ -1,9 +1,11 @@
 import { listCategories } from "./categories.js";
 import { updateExpense, deleteExpense } from "./expenses.js";
 import { openModal, closeModal, showToast } from "./ui.js";
+import { starsInput, wireStars, getStars, RATING_LABELS } from "./rating.js";
 
 let onDoneCallback = null;
 let currentId = null;
+let categories = [];
 let wired = false;
 
 function els() {
@@ -16,25 +18,48 @@ function els() {
     del: document.getElementById("edit-delete"),
     cancel: document.getElementById("edit-cancel"),
     splitNote: document.getElementById("edit-split-note"),
+    ratingBox: document.getElementById("edit-rating-box"),
+    ratingStars: document.getElementById("edit-rating-stars"),
+    ratingLabel: document.getElementById("edit-rating-label"),
   };
 }
 
 async function populateCategories(selectedId) {
   const { category } = els();
-  const cats = await listCategories();
-  category.innerHTML = cats
-    .map((c) => `<option value="${c.id}">${c.icon} ${c.name}</option>`)
-    .join("");
-  category.value = selectedId;
+  categories = await listCategories();
+  category.innerHTML = categories.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  category.value = categories.some((c) => c.id === selectedId) ? selectedId : categories[0]?.id;
+}
+
+function renderRating(value) {
+  const { ratingBox, ratingStars, ratingLabel, category } = els();
+  const cat = categories.find((c) => c.id === category.value);
+  const ratable = Boolean(cat && cat.ratable);
+  ratingBox.hidden = !ratable;
+  if (!ratable) return;
+  ratingStars.innerHTML = starsInput(value);
+  ratingLabel.textContent = RATING_LABELS[Number(value) || 0];
+  wireStars(ratingStars.querySelector(".stars-input"), (v) => {
+    ratingLabel.textContent = RATING_LABELS[v];
+  });
+}
+
+function currentRating() {
+  const box = document.querySelector("#edit-rating-stars .stars-input");
+  const { ratingBox } = els();
+  if (ratingBox.hidden || !box) return 0;
+  return getStars(box);
 }
 
 function wire() {
   if (wired) return;
   wired = true;
-  const { save, del, cancel } = els();
+  const { save, del, cancel, category } = els();
+
+  category.addEventListener("change", () => renderRating(currentRating()));
 
   save.addEventListener("click", async () => {
-    const { amount, category, date, note } = els();
+    const { amount, date, note } = els();
     const amt = Number(amount.value);
     if (!amt || amt <= 0) {
       showToast("請輸入有效金額");
@@ -49,6 +74,7 @@ function wire() {
       categoryId: category.value,
       date: date.value,
       note: note.value,
+      rating: currentRating(),
     });
     closeModal("expense-modal");
     showToast("已儲存");
@@ -81,5 +107,6 @@ export async function openExpenseEditor(expense, onDone) {
     splitNote.hidden = true;
   }
   await populateCategories(expense.categoryId);
+  renderRating(expense.rating || 0);
   openModal("expense-modal");
 }

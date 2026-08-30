@@ -53,13 +53,14 @@ export async function getExpense(id) {
   return getById(STORE_EXPENSES, id);
 }
 
-export async function createExpense({ amount, categoryId, date, note, split }) {
+export async function createExpense({ amount, categoryId, date, note, split, rating }) {
   const expense = {
     amount: Number(amount),
     categoryId,
     date,
     yearMonth: isoToYearMonth(date),
     note: note ? note.trim() : "",
+    rating: Number(rating) || 0,
     createdAt: Date.now(),
   };
   if (split) expense.split = split;
@@ -73,6 +74,7 @@ export async function updateExpense(id, changes) {
   const updated = { ...existing, ...changes };
   if (changes.date) updated.yearMonth = isoToYearMonth(changes.date);
   if (changes.amount !== undefined) updated.amount = Number(changes.amount);
+  if (changes.rating !== undefined) updated.rating = Number(changes.rating) || 0;
   await put(STORE_EXPENSES, updated);
   return updated;
 }
@@ -108,4 +110,16 @@ export async function recentMonthlyTotals(monthCount) {
     cursor = shiftYearMonth(cursor, -1);
   }
   return months.map((ym) => ({ yearMonth: ym, total: totals[ym] || 0 }));
+}
+
+/* Food & drink records that carry a score (rating 1-5). */
+export async function listRatedExpenses() {
+  const all = await listExpenses();
+  return all.filter((e) => Number(e.rating) > 0);
+}
+
+/* Ratable records still waiting for a score, newest first. */
+export async function listPendingRatings(ratableCategoryIds) {
+  const all = await listExpenses();
+  return all.filter((e) => !Number(e.rating) && ratableCategoryIds.has(e.categoryId));
 }

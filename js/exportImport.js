@@ -37,10 +37,16 @@ export async function exportCSV() {
     getAll(STORE_CATEGORIES),
   ]);
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]));
-  const rows = [["日期", "分類", "金額", "備註"]];
+  const rows = [["日期", "分類", "金額", "備註", "評分"]];
   const sorted = [...expenses].sort((a, b) => a.date.localeCompare(b.date));
   for (const e of sorted) {
-    rows.push([e.date, catMap[e.categoryId] || e.categoryId, e.amount, (e.note || "").replace(/[\r\n,]/g, " ")]);
+    rows.push([
+      e.date,
+      catMap[e.categoryId] || e.categoryId,
+      e.amount,
+      (e.note || "").replace(/[\r\n,]/g, " "),
+      Number(e.rating) || "",
+    ]);
   }
   const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const filename = `expenses-${new Date().toISOString().slice(0, 10)}.csv`;

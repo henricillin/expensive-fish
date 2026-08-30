@@ -1,9 +1,12 @@
-import { listCategories } from "../categories.js";
+import { listCategories, categoryMap } from "../categories.js";
 import { listExpenses, formatYearMonthLabel } from "../expenses.js";
 import { formatMoney, escapeHtml } from "../ui.js";
 import { openExpenseEditor } from "../expenseModal.js";
+import { icon, iconBadge } from "../icons.js";
+import { starsStatic } from "../rating.js";
 
 export const elementId = "view-records";
+export const title = "消費明細";
 
 let wired = false;
 
@@ -26,8 +29,7 @@ function groupByDate(expenses) {
 
 async function renderList() {
   const { monthFilter, categoryFilter, list } = els();
-  const cats = await listCategories();
-  const catMap = Object.fromEntries(cats.map((c) => [c.id, c]));
+  const { get } = await categoryMap();
   let all = await listExpenses();
 
   const month = monthFilter.value;
@@ -36,21 +38,22 @@ async function renderList() {
   if (category !== "all") all = all.filter((e) => e.categoryId === category);
 
   if (!all.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🔍</span>沒有符合條件的記錄</div>`;
+    list.innerHTML = `<div class="empty-state"><span class="empty-icon">${icon("search", { size: 24 })}</span><div>沒有符合條件的記錄</div></div>`;
     return;
   }
 
   const groups = groupByDate(all);
   let html = "";
   for (const [date, items] of groups) {
-    html += `<div class="day-group-label">${date}</div>`;
+    const dayTotal = items.reduce((s, e) => s + e.amount, 0);
+    html += `<div class="day-group-label" style="display:flex;justify-content:space-between;"><span>${date}</span><span>${formatMoney(dayTotal)}</span></div>`;
     for (const e of items) {
-      const c = catMap[e.categoryId] || { icon: "🏷️", name: "未分類" };
+      const c = get(e.categoryId);
       html += `<div class="record-item" data-id="${e.id}">
-        <div class="emoji">${c.icon}</div>
+        ${iconBadge(c.icon, c.color)}
         <div class="meta">
-          <div class="name">${escapeHtml(c.name)}</div>
-          <div class="sub">${escapeHtml(e.note || "")}</div>
+          <div class="name">${escapeHtml(e.note || c.name)}</div>
+          <div class="sub">${escapeHtml(c.name)} ${starsStatic(e.rating, { size: 12 })}</div>
         </div>
         <div class="amount">${formatMoney(e.amount)}</div>
       </div>`;
@@ -58,9 +61,8 @@ async function renderList() {
   }
   list.innerHTML = html;
   list.querySelectorAll(".record-item").forEach((row) => {
-    row.addEventListener("click", async () => {
-      const id = Number(row.dataset.id);
-      const expense = all.find((e) => e.id === id);
+    row.addEventListener("click", () => {
+      const expense = all.find((e) => e.id === Number(row.dataset.id));
       openExpenseEditor(expense, refresh);
     });
   });
@@ -81,7 +83,7 @@ async function populateFilters() {
   const prevCat = categoryFilter.value || "all";
   categoryFilter.innerHTML =
     `<option value="all">全部分類</option>` +
-    cats.map((c) => `<option value="${c.id}">${c.icon} ${escapeHtml(c.name)}</option>`).join("");
+    cats.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   if ([...categoryFilter.options].some((o) => o.value === prevCat)) categoryFilter.value = prevCat;
 }
 

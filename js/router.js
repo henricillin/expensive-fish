@@ -1,3 +1,5 @@
+import { icon } from "./icons.js";
+
 const routes = new Map();
 let currentPath = null;
 
@@ -8,6 +10,23 @@ export function registerRoute(path, view) {
 function resolvePath() {
   const hash = location.hash.replace(/^#/, "");
   return routes.has(hash) ? hash : "/home";
+}
+
+function renderHeader(view) {
+  const titleEl = document.getElementById("app-title");
+  const backEl = document.getElementById("app-back");
+  if (titleEl) titleEl.textContent = view?.title || "";
+  if (!backEl) return;
+  if (view?.back) {
+    backEl.hidden = false;
+    backEl.innerHTML = icon("chevronLeft", { size: 22 });
+    backEl.onclick = () => {
+      location.hash = view.back;
+    };
+  } else {
+    backEl.hidden = true;
+    backEl.onclick = null;
+  }
 }
 
 async function render() {
@@ -27,6 +46,9 @@ async function render() {
   });
 
   const view = routes.get(path);
+  renderHeader(view);
+  window.scrollTo(0, 0);
+
   if (view && typeof view.onShow === "function") {
     await view.onShow();
   }

@@ -1,16 +1,11 @@
-import { createCategory, updateCategory, deleteCategory } from "./categories.js";
+import { createCategory, updateCategory, deleteCategory, CATEGORY_COLORS } from "./categories.js";
 import { openModal, closeModal, showToast } from "./ui.js";
-
-const EMOJI_CHOICES = [
-  "🍔", "🥤", "🧴", "🚌", "🍜", "☕", "🛒", "🏠",
-  "💊", "🎮", "📚", "🎬", "✈️", "🐾", "🎁", "👕",
-  "💇", "📱", "🏋️", "🚗", "🧾", "🍎", "🍺", "💰",
-  "🎓", "🧻", "🛠️", "🌿",
-];
+import { icon, CATEGORY_ICON_CHOICES, FOOD_DRINK_ICONS } from "./icons.js";
 
 let mode = "create";
 let editingId = null;
-let selectedEmoji = EMOJI_CHOICES[0];
+let selectedIcon = CATEGORY_ICON_CHOICES[0];
+let selectedColor = CATEGORY_COLORS[0];
 let onDoneCallback = null;
 let wired = false;
 
@@ -18,22 +13,41 @@ function els() {
   return {
     title: document.getElementById("category-modal-title"),
     name: document.getElementById("cat-name"),
-    picker: document.getElementById("cat-emoji-picker"),
+    iconPicker: document.getElementById("cat-icon-picker"),
+    colorPicker: document.getElementById("cat-color-picker"),
+    ratable: document.getElementById("cat-ratable"),
     save: document.getElementById("cat-save"),
     del: document.getElementById("cat-delete"),
     cancel: document.getElementById("cat-cancel"),
   };
 }
 
-function renderPicker() {
-  const { picker } = els();
-  picker.innerHTML = EMOJI_CHOICES.map(
-    (e) => `<button type="button" data-emoji="${e}" class="${e === selectedEmoji ? "selected" : ""}">${e}</button>`
+function renderPickers() {
+  const { iconPicker, colorPicker } = els();
+
+  iconPicker.innerHTML = CATEGORY_ICON_CHOICES.map(
+    (name) =>
+      `<button type="button" data-icon="${name}" class="${name === selectedIcon ? "selected" : ""}" ${name === selectedIcon ? `style="color:${selectedColor};border-color:${selectedColor}"` : ""}>${icon(name, { size: 22 })}</button>`
   ).join("");
-  picker.querySelectorAll("button").forEach((btn) => {
+  iconPicker.querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      selectedEmoji = btn.dataset.emoji;
-      renderPicker();
+      const previous = selectedIcon;
+      selectedIcon = btn.dataset.icon;
+      // Switching to a food/drink icon suggests turning rating on, but never forces it off.
+      if (FOOD_DRINK_ICONS.has(selectedIcon) && !FOOD_DRINK_ICONS.has(previous) && mode === "create") {
+        els().ratable.checked = true;
+      }
+      renderPickers();
+    });
+  });
+
+  colorPicker.innerHTML = CATEGORY_COLORS.map(
+    (c) => `<button type="button" data-color="${c}" class="${c === selectedColor ? "selected" : ""}" style="background:${c}" aria-label="${c}"></button>`
+  ).join("");
+  colorPicker.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectedColor = btn.dataset.color;
+      renderPickers();
     });
   });
 }
@@ -44,17 +58,18 @@ function wire() {
   const { save, del, cancel } = els();
 
   save.addEventListener("click", async () => {
-    const { name } = els();
+    const { name, ratable } = els();
     const trimmed = name.value.trim();
     if (!trimmed) {
       showToast("請輸入分類名稱");
       return;
     }
+    const payload = { name: trimmed, icon: selectedIcon, color: selectedColor, ratable: ratable.checked };
     try {
       if (mode === "create") {
-        await createCategory({ name: trimmed, icon: selectedEmoji });
+        await createCategory(payload);
       } else {
-        await updateCategory(editingId, { name: trimmed, icon: selectedEmoji });
+        await updateCategory(editingId, payload);
       }
       closeModal("category-modal");
       showToast("已儲存");
@@ -65,7 +80,7 @@ function wire() {
   });
 
   del.addEventListener("click", async () => {
-    if (!confirm("刪除分類不會刪除已記錄的支出，但那些支出會保留原分類名稱顯示。確定刪除？")) return;
+    if (!confirm("刪除分類不會刪除已記錄的支出，但那些支出會顯示為未分類。確定刪除？")) return;
     try {
       await deleteCategory(editingId);
       closeModal("category-modal");
@@ -84,12 +99,14 @@ export function openCategoryCreator(onDone) {
   mode = "create";
   editingId = null;
   onDoneCallback = onDone;
-  const { title, name, del } = els();
+  const { title, name, del, ratable } = els();
   title.textContent = "新增分類";
   name.value = "";
-  selectedEmoji = EMOJI_CHOICES[0];
+  selectedIcon = CATEGORY_ICON_CHOICES[0];
+  selectedColor = CATEGORY_COLORS[0];
+  ratable.checked = FOOD_DRINK_ICONS.has(selectedIcon);
   del.hidden = true;
-  renderPicker();
+  renderPickers();
   openModal("category-modal");
 }
 
@@ -98,11 +115,13 @@ export function openCategoryEditor(category, onDone) {
   mode = "edit";
   editingId = category.id;
   onDoneCallback = onDone;
-  const { title, name, del } = els();
+  const { title, name, del, ratable } = els();
   title.textContent = "編輯分類";
   name.value = category.name;
-  selectedEmoji = category.icon;
+  selectedIcon = category.icon;
+  selectedColor = category.color || CATEGORY_COLORS[0];
+  ratable.checked = Boolean(category.ratable);
   del.hidden = false;
-  renderPicker();
+  renderPickers();
   openModal("category-modal");
 }

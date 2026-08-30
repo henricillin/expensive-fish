@@ -1,4 +1,4 @@
-const CACHE_VERSION = "expense-tracker-v4";
+const CACHE_VERSION = "expense-tracker-v5";
 
 const PRECACHE_URLS = [
   "./",
@@ -11,6 +11,9 @@ const PRECACHE_URLS = [
   "./js/db.js",
   "./js/categories.js",
   "./js/expenses.js",
+  "./js/icons.js",
+  "./js/rating.js",
+  "./js/summary.js",
   "./js/budgets.js",
   "./js/charts.js",
   "./js/exportImport.js",
@@ -24,7 +27,7 @@ const PRECACHE_URLS = [
   "./js/settleModal.js",
   "./js/views/home.js",
   "./js/views/records.js",
-  "./js/views/summary.js",
+  "./js/views/ratings.js",
   "./js/views/more.js",
   "./js/views/split.js",
   "./js/vendor/chart.umd.min.js",

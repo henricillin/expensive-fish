@@ -3,8 +3,11 @@ import { computeBalances } from "../settlements.js";
 import { formatMoney, escapeHtml } from "../ui.js";
 import { openPersonCreator, openPersonEditor } from "../personModal.js";
 import { openSettleModal } from "../settleModal.js";
+import { icon } from "../icons.js";
 
 export const elementId = "view-split";
+export const title = "分帳總覽";
+export const back = "/more";
 
 let wired = false;
 let expandedId = null;
@@ -28,7 +31,7 @@ async function render() {
   const balances = await computeBalances();
 
   if (!people.length) {
-    list.innerHTML = `<div class="empty-state"><span class="emoji">🧑‍🤝‍🧑</span>還沒有加入任何同伴，先新增一位吧！</div>`;
+    list.innerHTML = `<div class="empty-state"><span class="empty-icon">${icon("users", { size: 24 })}</span><div>還沒有加入任何同伴，先新增一位吧！</div></div>`;
     return;
   }
 
@@ -100,6 +103,7 @@ function wire() {
   if (wired) return;
   wired = true;
   const { addBtn } = els();
+  addBtn.innerHTML = `${icon("plus", { size: 16 })}<span>新增同伴</span>`;
   addBtn.addEventListener("click", () => {
     openPersonCreator(() => render());
   });
