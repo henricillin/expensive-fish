@@ -196,6 +196,80 @@
     <div id="split-balance-list"></div>
   </section>
 
+  <!-- Trips overview (bottom tab) -->
+  <section id="view-trips" class="view" hidden>
+    <div class="card-row" style="margin-bottom:14px;">
+      <span class="section-title" style="margin:0;">我的方案</span>
+      <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
+    </div>
+    <div id="trips-container"></div>
+  </section>
+
+  <!-- One trip: packing list + who owes who (reached from the trips tab) -->
+  <section id="view-trip" class="view" hidden>
+    <div class="card">
+      <div class="card-row">
+        <span class="packing-card-name" id="trip-detail-name"></span>
+        <button class="btn btn-ghost accent" id="trip-detail-edit"></button>
+      </div>
+      <div class="trip-dates" id="trip-detail-dates" hidden></div>
+      <div class="pill-row" id="trip-detail-members"></div>
+      <div class="stat-grid" style="margin-top:14px;">
+        <div>
+          <div class="stat-value" id="trip-stat-total">$0</div>
+          <div class="stat-label">這趟總花費</div>
+        </div>
+        <div>
+          <div class="stat-value" id="trip-stat-mine">$0</div>
+          <div class="stat-label">我的份</div>
+        </div>
+        <div>
+          <div class="stat-value" id="trip-stat-net">$0</div>
+          <div class="stat-label" id="trip-stat-net-label">已結清</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="segmented" id="trip-pane-switch">
+      <button type="button" class="selected" data-pane="list">攜帶清單</button>
+      <button type="button" data-pane="money">算帳</button>
+    </div>
+
+    <div id="trip-pane-list">
+      <div class="card">
+        <div class="progress-track"><div class="progress-fill" id="trip-progress"></div></div>
+        <div class="card-row" style="margin-top:6px;font-size:13px;color:var(--color-text-muted);">
+          <span id="trip-item-count"></span>
+        </div>
+      </div>
+
+      <div class="quick-add-row">
+        <input id="trip-new-item" type="text" placeholder="要帶什麼？打完按 Enter" maxlength="40" />
+        <button class="btn btn-primary" id="trip-add-item" aria-label="新增項目"></button>
+      </div>
+
+      <div class="segmented" id="trip-group-mode">
+        <button type="button" class="selected" data-group="item">依項目</button>
+        <button type="button" data-group="person">依人分組</button>
+      </div>
+
+      <div id="trip-item-list"></div>
+
+      <div class="modal-actions" style="margin-top:14px;">
+        <button class="btn btn-ghost" id="trip-uncheck-all">全部取消勾選</button>
+        <button class="btn btn-ghost" id="trip-clear-done">清除已勾選</button>
+      </div>
+    </div>
+
+    <div id="trip-pane-money" hidden>
+      <div class="card-row" style="margin-bottom:12px;">
+        <span class="section-title" style="margin:0;">這趟的花費</span>
+        <button class="btn btn-ghost accent" id="trip-add-expense"></button>
+      </div>
+      <div id="trip-money-body"></div>
+    </div>
+  </section>
+
   <nav class="tabbar" id="tabbar"></nav>
 </div>
 
@@ -297,6 +371,143 @@
       <button class="btn btn-primary" id="split-apply">套用</button>
     </div>
     <button class="btn btn-ghost btn-block" id="split-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Trip add/edit modal -->
+<div class="modal-backdrop" id="trip-modal" hidden>
+  <div class="modal-sheet">
+    <h2 id="trip-modal-title">新增方案</h2>
+    <div class="field">
+      <label for="trip-name">方案名稱</label>
+      <input id="trip-name" type="text" maxlength="24" placeholder="沖繩 3 天 2 夜" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="trip-start">開始日期（選填）</label>
+        <input id="trip-start" type="date" />
+      </div>
+      <div class="field">
+        <label for="trip-end">結束日期（選填）</label>
+        <input id="trip-end" type="date" />
+      </div>
+    </div>
+    <div class="field">
+      <div class="card-row" style="margin-bottom:6px;">
+        <label style="margin:0;">同行的人</label>
+        <button type="button" class="btn btn-ghost accent" id="trip-add-person">新增同伴</button>
+      </div>
+      <div class="chip-select" id="trip-members"></div>
+      <p class="settings-desc" style="margin:6px 0 0;">你自己一定在方案裡，不用勾。</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="trip-delete" hidden>刪除</button>
+      <button class="btn btn-primary" id="trip-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="trip-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Trip expense modal -->
+<div class="modal-backdrop" id="trip-expense-modal" hidden>
+  <div class="modal-sheet">
+    <h2 id="trip-expense-title">新增花費</h2>
+    <div class="field">
+      <label for="trip-expense-note">項目</label>
+      <input id="trip-expense-note" type="text" maxlength="60" placeholder="晚餐、租車、住宿…" />
+    </div>
+    <div class="field">
+      <label for="trip-expense-total">總金額</label>
+      <input id="trip-expense-total" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="trip-expense-category">分類</label>
+        <select id="trip-expense-category"></select>
+      </div>
+      <div class="field">
+        <label for="trip-expense-date">日期</label>
+        <input id="trip-expense-date" type="date" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="trip-expense-payer">誰先付的錢</label>
+      <select id="trip-expense-payer"></select>
+    </div>
+    <div class="field">
+      <label>誰要分</label>
+      <div style="display:flex;gap:8px;margin-bottom:4px;">
+        <button type="button" class="btn method-btn selected" data-method="equal" style="flex:1;">平均分攤</button>
+        <button type="button" class="btn method-btn" data-method="custom" style="flex:1;">自訂金額</button>
+      </div>
+      <div id="trip-expense-participants"></div>
+    </div>
+    <div class="card-row" id="trip-expense-summary" style="font-size:13px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="trip-expense-delete" hidden>刪除</button>
+      <button class="btn btn-primary" id="trip-expense-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="trip-expense-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Trip settle-up modal -->
+<div class="modal-backdrop" id="trip-settle-modal" hidden>
+  <div class="modal-sheet">
+    <h2>登記結清</h2>
+    <div class="field-row">
+      <div class="field">
+        <label for="trip-settle-from">誰付錢</label>
+        <select id="trip-settle-from"></select>
+      </div>
+      <div class="field">
+        <label for="trip-settle-to">付給誰</label>
+        <select id="trip-settle-to"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="trip-settle-amount">金額</label>
+      <input id="trip-settle-amount" type="number" inputmode="decimal" min="0" step="1" />
+    </div>
+    <div class="field">
+      <label for="trip-settle-date">日期</label>
+      <input id="trip-settle-date" type="date" />
+    </div>
+    <div class="field">
+      <label for="trip-settle-note">備註（選填）</label>
+      <input id="trip-settle-note" type="text" maxlength="60" placeholder="現金、轉帳…" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="trip-settle-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="trip-settle-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Packing item edit modal -->
+<div class="modal-backdrop" id="packing-item-modal" hidden>
+  <div class="modal-sheet">
+    <h2>編輯項目</h2>
+    <div class="field">
+      <label for="packing-item-name">名稱</label>
+      <input id="packing-item-name" type="text" maxlength="40" />
+    </div>
+    <div class="field">
+      <div class="card-row" style="margin-bottom:6px;">
+        <label for="packing-item-person" style="margin:0;">誰帶</label>
+        <button type="button" class="btn btn-ghost accent" id="packing-item-add-person">管理成員</button>
+      </div>
+      <select id="packing-item-person"></select>
+    </div>
+    <div class="field">
+      <label for="packing-item-note">備註（選填）</label>
+      <input id="packing-item-note" type="text" maxlength="40" placeholder="數量、放在哪…" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="packing-item-delete">刪除</button>
+      <button class="btn btn-primary" id="packing-item-save">儲存</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="packing-item-cancel" style="margin-top:8px;">取消</button>
   </div>
 </div>
 

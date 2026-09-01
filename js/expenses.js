@@ -53,7 +53,7 @@ export async function getExpense(id) {
   return getById(STORE_EXPENSES, id);
 }
 
-export async function createExpense({ amount, categoryId, date, note, split, rating }) {
+export async function createExpense({ amount, categoryId, date, note, split, rating, tripId }) {
   const expense = {
     amount: Number(amount),
     categoryId,
@@ -64,6 +64,7 @@ export async function createExpense({ amount, categoryId, date, note, split, rat
     createdAt: Date.now(),
   };
   if (split) expense.split = split;
+  if (tripId) expense.tripId = tripId;
   const id = await add(STORE_EXPENSES, expense);
   return { ...expense, id };
 }

@@ -2,16 +2,20 @@ import { seedDefaultCategoriesIfEmpty, migrateCategories } from "./categories.js
 import { registerRoute, startRouter } from "./router.js";
 import { refreshBadgeOnly } from "./summary.js";
 import { icon } from "./icons.js";
+import { showToast } from "./ui.js";
 import * as home from "./views/home.js";
 import * as records from "./views/records.js";
 import * as ratings from "./views/ratings.js";
 import * as more from "./views/more.js";
 import * as split from "./views/split.js";
+import * as trips from "./views/trips.js";
+import * as trip from "./views/trip.js";
 
 const TABS = [
   { route: "/home", label: "記一筆", icon: "pencil", dot: "summary-tab-dot" },
   { route: "/records", label: "明細", icon: "list" },
   { route: "/ratings", label: "評分", icon: "star" },
+  { route: "/trips", label: "方案", icon: "plane" },
   { route: "/more", label: "更多", icon: "sliders" },
 ];
 
@@ -43,17 +47,25 @@ function wireHeaderShadow() {
 }
 
 async function init() {
-  await seedDefaultCategoriesIfEmpty();
-  await migrateCategories();
-
+  /* 先把外框畫出來，資料庫萬一卡住（例如 App 同時開在另一個分頁）也不會整頁空白。 */
   renderTabbar();
   wireHeaderShadow();
+
+  try {
+    await seedDefaultCategoriesIfEmpty();
+    await migrateCategories();
+  } catch (err) {
+    showToast(err.message || "資料庫打不開");
+    console.error(err);
+  }
 
   registerRoute("/home", home);
   registerRoute("/records", records);
   registerRoute("/ratings", ratings);
   registerRoute("/more", more);
   registerRoute("/split", split);
+  registerRoute("/trips", trips);
+  registerRoute("/trip", trip);
 
   startRouter();
   refreshBadgeOnly();

@@ -1,4 +1,4 @@
-import { STORE_SETTLEMENTS, getAll, add, remove } from "./db.js";
+import { STORE_SETTLEMENTS, STORE_TRIP_SETTLEMENTS, getAll, add, remove } from "./db.js";
 import { listExpenses } from "./expenses.js";
 import { ME } from "./people.js";
 
@@ -24,7 +24,11 @@ export async function deleteSettlement(id) {
 }
 
 export async function computeBalances() {
-  const [expenses, settlements] = await Promise.all([listExpenses(), listSettlements()]);
+  const [expenses, settlements, tripSettlements] = await Promise.all([
+    listExpenses(),
+    listSettlements(),
+    getAll(STORE_TRIP_SETTLEMENTS),
+  ]);
   const balances = new Map();
 
   function ensure(personId) {
@@ -58,6 +62,12 @@ export async function computeBalances() {
     const b = ensure(s.personId);
     if (s.type === "receive") b.owedToMe -= s.amount;
     else b.owedByMe -= s.amount;
+  }
+
+  /* 在方案裡登記的結清，只要牽涉到我，就一起沖掉總覽的欠款。 */
+  for (const s of tripSettlements) {
+    if (s.toId === ME.id) ensure(s.fromId).owedToMe -= s.amount;
+    else if (s.fromId === ME.id) ensure(s.toId).owedByMe -= s.amount;
   }
 
   for (const b of balances.values()) {

@@ -39,6 +39,8 @@ const ICONS = {
   users: `<circle cx="9" cy="8" r="3.3"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><path d="M16.2 5.2a3.3 3.3 0 0 1 0 6"/><path d="M17.8 14.4a6.2 6.2 0 0 1 3.9 5.1"/>`,
   search: `<circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/>`,
   plus: `<path d="M12 5v14M5 12h14"/>`,
+  check: `<path d="m4.5 12.3 5.2 5.2L19.5 7"/>`,
+  close: `<path d="M6 6l12 12M18 6 6 18"/>`,
   chevronRight: `<path d="m9.5 4.5 7.5 7.5-7.5 7.5"/>`,
   chevronLeft: `<path d="M14.5 4.5 7 12l7.5 7.5"/>`,
   download: `<path d="M12 3.5v11.5"/><path d="m7 10.5 5 5 5-5"/><path d="M4 20h16"/>`,

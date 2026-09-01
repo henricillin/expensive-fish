@@ -1,0 +1,405 @@
+/* 一個方案的內容：上面是這趟的概況，下面切「攜帶清單」和「帳目」兩頁。 */
+import {
+  getTrip,
+  computeTripAccounts,
+  tripMembers,
+  formatTripDates,
+  deleteTripSettlement,
+} from "../trips.js";
+import {
+  listItems,
+  addItem,
+  toggleItem,
+  uncheckAll,
+  removeDone,
+  progressOf,
+  UNASSIGNED,
+} from "../packing.js";
+import { categoryMap } from "../categories.js";
+import { escapeHtml, showToast, formatMoney } from "../ui.js";
+import { icon, iconBadge } from "../icons.js";
+import { openTripEditor } from "../tripModal.js";
+import { openPackingItemEditor } from "../packingItemModal.js";
+import { openTripExpenseModal } from "../tripExpenseModal.js";
+import { openTripSettleModal } from "../tripSettleModal.js";
+import { navigate } from "../router.js";
+
+export const elementId = "view-trip";
+export const title = "方案";
+export const back = "/trips";
+
+let currentTripId = null;
+let currentTrip = null;
+let pane = "list";
+let groupMode = "item";
+let wired = false;
+
+export function setCurrentTrip(id) {
+  currentTripId = id;
+  pane = "list";
+}
+
+function els() {
+  return {
+    name: document.getElementById("trip-detail-name"),
+    dates: document.getElementById("trip-detail-dates"),
+    members: document.getElementById("trip-detail-members"),
+    editBtn: document.getElementById("trip-detail-edit"),
+    statTotal: document.getElementById("trip-stat-total"),
+    statMine: document.getElementById("trip-stat-mine"),
+    statNet: document.getElementById("trip-stat-net"),
+    statNetLabel: document.getElementById("trip-stat-net-label"),
+    paneSwitch: document.getElementById("trip-pane-switch"),
+    paneList: document.getElementById("trip-pane-list"),
+    paneMoney: document.getElementById("trip-pane-money"),
+    progress: document.getElementById("trip-progress"),
+    itemCount: document.getElementById("trip-item-count"),
+    input: document.getElementById("trip-new-item"),
+    addItemBtn: document.getElementById("trip-add-item"),
+    groupSwitch: document.getElementById("trip-group-mode"),
+    itemList: document.getElementById("trip-item-list"),
+    uncheckAllBtn: document.getElementById("trip-uncheck-all"),
+    clearDoneBtn: document.getElementById("trip-clear-done"),
+    addExpenseBtn: document.getElementById("trip-add-expense"),
+    moneyBody: document.getElementById("trip-money-body"),
+  };
+}
+
+/* ---- 攜帶清單 ---- */
+
+function itemRow(item, personName) {
+  return `<div class="packing-item${item.done ? " done" : ""}" data-id="${item.id}">
+    <button type="button" class="packing-check${item.done ? " checked" : ""}" data-id="${item.id}"
+      aria-label="${item.done ? "取消勾選" : "標記已準備"}">${icon("check", { size: 15 })}</button>
+    <div class="meta">
+      <div class="name">${escapeHtml(item.name)}</div>
+      ${item.note ? `<div class="sub">${escapeHtml(item.note)}</div>` : ""}
+    </div>
+    ${personName ? `<span class="person-pill">${escapeHtml(personName)}</span>` : ""}
+  </div>`;
+}
+
+function groupedHtml(items, members) {
+  const groups = new Map();
+  for (const p of members.options) groups.set(p.id, []);
+  groups.set(UNASSIGNED.id, []);
+  for (const item of items) {
+    const key = groups.has(item.personId) ? item.personId : UNASSIGNED.id;
+    groups.get(key).push(item);
+  }
+  let html = "";
+  for (const [id, group] of groups) {
+    if (!group.length) continue;
+    const { done, total } = progressOf(group);
+    const label = id === UNASSIGNED.id ? UNASSIGNED.name : members.get(id).name;
+    html += `<div class="day-group-label">${escapeHtml(label)} ${done}/${total}</div>`;
+    html += `<div class="card">${group.map((i) => itemRow(i, "")).join("")}</div>`;
+  }
+  return html;
+}
+
+async function renderPacking(members) {
+  const { progress, itemCount, itemList, clearDoneBtn, uncheckAllBtn } = els();
+  const items = await listItems(currentTripId);
+  const { total, done } = progressOf(items);
+
+  itemCount.textContent = total ? `已準備 ${done} / ${total}` : "還沒有項目";
+  progress.style.width = total ? `${Math.round((done / total) * 100)}%` : "0%";
+  progress.classList.toggle("done", total > 0 && done === total);
+  clearDoneBtn.disabled = done === 0;
+  uncheckAllBtn.disabled = done === 0;
+
+  if (!items.length) {
+    itemList.innerHTML = `<div class="empty-state">
+      <span class="empty-icon">${icon("inbox", { size: 24 })}</span>
+      <div>還沒有東西。<br />在上面打字就能加進來。</div>
+    </div>`;
+    return;
+  }
+
+  if (groupMode === "person") {
+    itemList.innerHTML = groupedHtml(items, members);
+  } else {
+    const ordered = [...items.filter((i) => !i.done), ...items.filter((i) => i.done)];
+    itemList.innerHTML = `<div class="card">${ordered
+      .map((i) => itemRow(i, i.personId ? members.get(i.personId).name : ""))
+      .join("")}</div>`;
+  }
+
+  itemList.querySelectorAll(".packing-check").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      await toggleItem(Number(btn.dataset.id));
+      await render();
+    });
+  });
+
+  itemList.querySelectorAll(".packing-item").forEach((row) => {
+    row.addEventListener("click", () => {
+      const item = items.find((i) => i.id === Number(row.dataset.id));
+      if (item) openPackingItemEditor(item, currentTrip, render);
+    });
+  });
+}
+
+/* ---- 帳目 ---- */
+
+function expenseListHtml(acc, cats) {
+  if (!acc.expenses.length) {
+    return `<div class="empty-state">
+      <span class="empty-icon">${icon("receipt", { size: 24 })}</span>
+      <div>這趟還沒有花費。<br />按右上角「新增花費」記第一筆。</div>
+    </div>`;
+  }
+  const rows = acc.expenses
+    .map((e) => {
+      const c = cats.get(e.categoryId);
+      const split = e.split;
+      const payer = split ? acc.members.get(split.payerId).name : "我";
+      const count = split ? split.shares.length : 1;
+      const total = split ? split.totalAmount : e.amount;
+      return `<div class="record-item trip-expense-row" data-id="${e.id}">
+        ${iconBadge(c.icon, c.color)}
+        <div class="meta">
+          <div class="name">${escapeHtml(e.note || c.name)}</div>
+          <div class="sub">${e.date} · ${escapeHtml(payer)}先付 · ${count} 人分</div>
+        </div>
+        <div class="amount">${formatMoney(total)}<span class="amount-sub">我的份 ${formatMoney(e.amount)}</span></div>
+      </div>`;
+    })
+    .join("");
+  return `<div class="card">${rows}</div>`;
+}
+
+function balanceHtml(acc) {
+  const rows = acc.rows.filter((r) => r.paid || r.share);
+  if (!rows.length) return "";
+  const list = rows
+    .map((r) => {
+      const label =
+        r.net > 0
+          ? `<span class="over-label">要收回 ${formatMoney(r.net)}</span>`
+          : r.net < 0
+            ? `<span class="owe-label">要付出 ${formatMoney(-r.net)}</span>`
+            : `<span style="color:var(--color-text-muted);">已平</span>`;
+      return `<div class="balance-row">
+        <span class="name">${escapeHtml(r.name)}</span>
+        <span class="sub">付了 ${formatMoney(r.paid)} · 該分 ${formatMoney(r.share)}</span>
+        ${label}
+      </div>`;
+    })
+    .join("");
+  return `<div class="section-title">誰付了多少</div><div class="card">${list}</div>`;
+}
+
+function transferHtml(acc) {
+  if (!acc.expenses.length) return "";
+  if (!acc.transfers.length) {
+    return `<div class="section-title">怎麼喬</div>
+      <div class="card"><div class="settings-desc" style="margin:0;">大家的帳都平了，不用再轉了。</div></div>`;
+  }
+  const rows = acc.transfers
+    .map(
+      (t) => `<div class="transfer-row">
+        <span class="transfer-text">
+          <strong>${escapeHtml(acc.members.get(t.fromId).name)}</strong>
+          ${icon("chevronRight", { size: 14 })}
+          <strong>${escapeHtml(acc.members.get(t.toId).name)}</strong>
+          <span class="transfer-amount">${formatMoney(t.amount)}</span>
+        </span>
+        <button type="button" class="btn btn-ghost accent transfer-settle" data-from="${t.fromId}" data-to="${t.toId}" data-amount="${t.amount}">登記結清</button>
+      </div>`
+    )
+    .join("");
+  return `<div class="section-title">怎麼喬</div>
+    <div class="card">${rows}
+      <p class="settings-desc" style="margin:10px 0 0;">這是「最少轉幾次帳」的算法，可能會把 A 欠 B 的錢直接轉給 C。跟你有關的那幾筆登記後，「分帳總覽」也會跟著沖掉。</p>
+    </div>`;
+}
+
+function settlementHtml(acc) {
+  if (!acc.settlements.length) return "";
+  const rows = acc.settlements
+    .map(
+      (s) => `<div class="balance-row">
+        <span class="name">${escapeHtml(acc.members.get(s.fromId).name)} → ${escapeHtml(acc.members.get(s.toId).name)}</span>
+        <span class="sub">${s.date}${s.note ? " · " + escapeHtml(s.note) : ""}</span>
+        <span>${formatMoney(s.amount)}</span>
+        <button type="button" class="icon-btn settle-delete" data-id="${s.id}" aria-label="刪除結清紀錄">${icon("close", { size: 16 })}</button>
+      </div>`
+    )
+    .join("");
+  return `<div class="section-title">結清紀錄</div><div class="card">${rows}</div>`;
+}
+
+async function renderMoney(acc) {
+  const { moneyBody } = els();
+  const cats = await categoryMap();
+  moneyBody.innerHTML =
+    expenseListHtml(acc, cats) + balanceHtml(acc) + transferHtml(acc) + settlementHtml(acc);
+
+  moneyBody.querySelectorAll(".trip-expense-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      const expense = acc.expenses.find((e) => e.id === Number(row.dataset.id));
+      if (expense) openTripExpenseModal(currentTrip, expense, render);
+    });
+  });
+
+  moneyBody.querySelectorAll(".transfer-settle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openTripSettleModal(
+        currentTrip,
+        {
+          fromId: btn.dataset.from,
+          toId: btn.dataset.to,
+          amount: Number(btn.dataset.amount),
+        },
+        render
+      );
+    });
+  });
+
+  moneyBody.querySelectorAll(".settle-delete").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("刪掉這筆結清紀錄？帳會變回沒結清的樣子。")) return;
+      await deleteTripSettlement(Number(btn.dataset.id));
+      showToast("已刪除結清紀錄");
+      await render();
+    });
+  });
+}
+
+/* ---- 整頁 ---- */
+
+async function render() {
+  const trip = currentTripId ? await getTrip(currentTripId) : null;
+  if (!trip) {
+    currentTripId = null;
+    currentTrip = null;
+    navigate("/trips");
+    return;
+  }
+  currentTrip = trip;
+
+  const { name, dates, members: memberBox, statTotal, statMine, statNet, statNetLabel } = els();
+  const titleEl = document.getElementById("app-title");
+  if (titleEl) titleEl.textContent = trip.name;
+
+  const [members, acc] = await Promise.all([
+    tripMembers(trip),
+    computeTripAccounts(trip.id, trip),
+  ]);
+
+  name.textContent = trip.name;
+  const range = formatTripDates(trip);
+  dates.textContent = range;
+  dates.hidden = !range;
+  memberBox.innerHTML = members.options
+    .map((p) => `<span class="person-pill">${escapeHtml(p.name)}</span>`)
+    .join("");
+
+  statTotal.textContent = formatMoney(acc.total);
+  statMine.textContent = formatMoney(acc.myShare);
+  statNet.textContent = formatMoney(Math.abs(acc.myNet));
+  statNet.classList.toggle("over-label", acc.myNet > 0);
+  statNetLabel.textContent =
+    acc.myNet > 0 ? "別人要還我" : acc.myNet < 0 ? "我要還別人" : "已結清";
+
+  renderPaneVisibility();
+  await renderPacking(members);
+  await renderMoney(acc);
+}
+
+function renderPaneVisibility() {
+  const { paneSwitch, paneList, paneMoney } = els();
+  paneList.hidden = pane !== "list";
+  paneMoney.hidden = pane !== "money";
+  paneSwitch.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("selected", b.dataset.pane === pane);
+  });
+}
+
+async function submitNewItem() {
+  const { input } = els();
+  const value = input.value.trim();
+  if (!value) return;
+  try {
+    await addItem(currentTripId, value);
+    input.value = "";
+    await render();
+  } catch (err) {
+    showToast(err.message);
+  }
+  input.focus();
+}
+
+function wire() {
+  if (wired) return;
+  wired = true;
+  const {
+    editBtn,
+    addItemBtn,
+    input,
+    paneSwitch,
+    groupSwitch,
+    clearDoneBtn,
+    uncheckAllBtn,
+    addExpenseBtn,
+  } = els();
+
+  editBtn.innerHTML = `${icon("pencil", { size: 16 })}<span>編輯</span>`;
+  addItemBtn.innerHTML = icon("plus", { size: 20 });
+  addExpenseBtn.innerHTML = `${icon("plus", { size: 16 })}<span>新增花費</span>`;
+
+  editBtn.addEventListener("click", () => {
+    if (!currentTrip) return;
+    openTripEditor(currentTrip, (updated) => {
+      if (updated) render();
+      else navigate("/trips");
+    });
+  });
+
+  addItemBtn.addEventListener("click", submitNewItem);
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") submitNewItem();
+  });
+
+  paneSwitch.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      pane = btn.dataset.pane;
+      renderPaneVisibility();
+    });
+  });
+
+  groupSwitch.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      groupMode = btn.dataset.group;
+      groupSwitch.querySelectorAll("button").forEach((b) => b.classList.toggle("selected", b === btn));
+      render();
+    });
+  });
+
+  clearDoneBtn.addEventListener("click", async () => {
+    if (!confirm("要把已勾選的項目刪掉嗎？")) return;
+    const removed = await removeDone(currentTripId);
+    showToast(`已清除 ${removed} 個項目`);
+    await render();
+  });
+
+  uncheckAllBtn.addEventListener("click", async () => {
+    if (!confirm("要把所有勾選取消嗎？（項目會留著，下次還能用）")) return;
+    await uncheckAll(currentTripId);
+    showToast("已全部取消勾選");
+    await render();
+  });
+
+  addExpenseBtn.addEventListener("click", () => {
+    if (!currentTrip) return;
+    openTripExpenseModal(currentTrip, null, render);
+  });
+}
+
+export async function onShow() {
+  wire();
+  await render();
+}

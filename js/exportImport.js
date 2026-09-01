@@ -1,6 +1,18 @@
-import { STORE_CATEGORIES, STORE_EXPENSES, STORE_BUDGETS, getAll, clearStore, add } from "./db.js";
+import {
+  STORE_CATEGORIES,
+  STORE_EXPENSES,
+  STORE_BUDGETS,
+  STORE_PEOPLE,
+  STORE_SETTLEMENTS,
+  STORE_TRIPS,
+  STORE_TRIP_SETTLEMENTS,
+  STORE_PACKING_ITEMS,
+  getAll,
+  clearStore,
+  add,
+} from "./db.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 3;
 
 function downloadBlob(content, filename, mime) {
   const blob = new Blob([content], { type: mime });
@@ -15,17 +27,28 @@ function downloadBlob(content, filename, mime) {
 }
 
 export async function exportJSON() {
-  const [categories, expenses, budgets] = await Promise.all([
-    getAll(STORE_CATEGORIES),
-    getAll(STORE_EXPENSES),
-    getAll(STORE_BUDGETS),
-  ]);
+  const [categories, expenses, budgets, people, settlements, trips, tripSettlements, packingItems] =
+    await Promise.all([
+      getAll(STORE_CATEGORIES),
+      getAll(STORE_EXPENSES),
+      getAll(STORE_BUDGETS),
+      getAll(STORE_PEOPLE),
+      getAll(STORE_SETTLEMENTS),
+      getAll(STORE_TRIPS),
+      getAll(STORE_TRIP_SETTLEMENTS),
+      getAll(STORE_PACKING_ITEMS),
+    ]);
   const payload = {
     version: SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     categories,
     expenses,
     budgets,
+    people,
+    settlements,
+    trips,
+    tripSettlements,
+    packingItems,
   };
   const filename = `expense-backup-${new Date().toISOString().slice(0, 10)}.json`;
   downloadBlob(JSON.stringify(payload, null, 2), filename, "application/json");
@@ -74,9 +97,28 @@ export async function importJSON(file) {
     throw new Error("備份檔內容不完整");
   }
 
+  /* 舊版備份沒有同伴／方案這些欄位，一律當成空陣列處理。
+     v2 以前的備份存的是 packingLists，直接當成方案還原。 */
+  const people = data.people || [];
+  const settlements = data.settlements || [];
+  const tripSettlements = data.tripSettlements || [];
+  const packingItems = data.packingItems || [];
+  const trips = (data.trips || data.packingLists || []).map((t) => ({
+    startDate: "",
+    endDate: "",
+    memberIds: [],
+    note: "",
+    ...t,
+  }));
+
   await clearStore(STORE_CATEGORIES);
   await clearStore(STORE_EXPENSES);
   await clearStore(STORE_BUDGETS);
+  await clearStore(STORE_PEOPLE);
+  await clearStore(STORE_SETTLEMENTS);
+  await clearStore(STORE_TRIPS);
+  await clearStore(STORE_TRIP_SETTLEMENTS);
+  await clearStore(STORE_PACKING_ITEMS);
 
   for (const c of data.categories) await add(STORE_CATEGORIES, c);
   for (const e of data.expenses) {
@@ -84,10 +126,28 @@ export async function importJSON(file) {
     await add(STORE_EXPENSES, rest);
   }
   for (const b of data.budgets || []) await add(STORE_BUDGETS, b);
+  for (const p of people) await add(STORE_PEOPLE, p);
+  /* 這幾個 store 是 autoIncrement，去掉 id 讓它重新編號；關聯用的是字串 id。 */
+  for (const st of settlements) {
+    const { id, ...rest } = st;
+    await add(STORE_SETTLEMENTS, rest);
+  }
+  for (const t of trips) await add(STORE_TRIPS, t);
+  for (const st of tripSettlements) {
+    const { id, ...rest } = st;
+    await add(STORE_TRIP_SETTLEMENTS, rest);
+  }
+  for (const it of packingItems) {
+    const { id, ...rest } = it;
+    await add(STORE_PACKING_ITEMS, rest);
+  }
 
   return {
     categories: data.categories.length,
     expenses: data.expenses.length,
     budgets: (data.budgets || []).length,
+    people: people.length,
+    trips: trips.length,
+    packingItems: packingItems.length,
   };
 }
