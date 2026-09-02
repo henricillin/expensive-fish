@@ -28,6 +28,8 @@ function normalize(trip) {
     startDate: "",
     endDate: "",
     note: "",
+    /* v5 之前的方案沒有這個欄位，沒有就是還沒收起來 */
+    archivedAt: null,
     ...trip,
     memberIds: Array.isArray(trip.memberIds) ? trip.memberIds : [],
   };
@@ -35,15 +37,16 @@ function normalize(trip) {
 
 /* ---- 方案 ---- */
 
-export async function listTrips() {
+/* 預設只給沒收起來的。archived: true 拿收起來的（照封存時間新的在前）。 */
+export async function listTrips({ archived = false } = {}) {
   const all = await getAll(STORE_TRIPS);
-  return all
-    .map(normalize)
-    .sort(
-      (a, b) =>
-        (b.startDate || "").localeCompare(a.startDate || "") ||
-        b.createdAt - a.createdAt
-    );
+  const wanted = all.map(normalize).filter((t) => Boolean(t.archivedAt) === archived);
+  if (archived) return wanted.sort((a, b) => b.archivedAt - a.archivedAt);
+  return wanted.sort(
+    (a, b) =>
+      (b.startDate || "").localeCompare(a.startDate || "") ||
+      b.createdAt - a.createdAt
+  );
 }
 
 export async function getTrip(id) {
@@ -78,6 +81,16 @@ export async function updateTrip(id, changes) {
   const updated = normalize({ ...existing, ...changes });
   await put(STORE_TRIPS, updated);
   return updated;
+}
+
+/* 收起來只是加個時間戳，資料一個都不動——比刪除安全，隨時可以再打開。 */
+export async function setTripArchived(id, archived) {
+  return updateTrip(id, { archivedAt: archived ? Date.now() : null });
+}
+
+/* 有花過錢、而且沒有人還要轉帳給誰，才算「這趟結清了」。 */
+export function isTripSettled(acc) {
+  return acc.expenses.length > 0 && acc.transfers.length === 0;
 }
 
 /* 刪方案會帶走清單項目和這趟的結清紀錄；花費留著（只是不再屬於任何方案）。 */

@@ -224,8 +224,16 @@ function wireForm() {
       date: date.value || todayISO(),
       note: note.value,
       rating: currentRating(),
+      /* myShare 不存——它只是 splitModal 回傳時順手算好給表單用的，
+         真正的金額就是上面的 amount。method / weights 要留著，
+         回頭編輯分帳才知道當初是照份數分的。 */
       split: currentSplit
-        ? { totalAmount: currentSplit.totalAmount, payerId: currentSplit.payerId, shares: currentSplit.shares }
+        ? {
+            totalAmount: currentSplit.totalAmount,
+            payerId: currentSplit.payerId,
+            shares: currentSplit.shares,
+            ...(currentSplit.method ? { method: currentSplit.method, weights: currentSplit.weights } : {}),
+          }
         : null,
     });
     amount.value = "";

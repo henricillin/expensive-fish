@@ -626,6 +626,19 @@
 }
 
 /* ---- Split ---- */
+/* 三個方式擠一排，所以字和 padding 都要比一般按鈕小 */
+.method-row {
+  display: flex;
+  gap: 8px;
+}
+
+.method-row .method-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 6px;
+  font-size: 14px;
+}
+
 .method-btn {
   background: var(--color-bg);
   color: var(--color-text-muted);
@@ -1092,6 +1105,221 @@
   cursor: pointer;
 }
 
+
+/* ---- 分帳那一排人（splitModal / tripExpenseModal 共用） ---- */
+.share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.share-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.share-weight-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* 這幾條要比 `.field input`（width:100%）更明確，不然分帳的小輸入框會被
+   撐成整行寬——用兩個 class 的選擇器就贏得過 class+元素。 */
+.share-row .share-weight,
+.share-row .share-input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-surface);
+  text-align: right;
+}
+
+.share-row .share-weight {
+  width: 56px;
+}
+
+.share-row .share-input {
+  width: 92px;
+}
+
+.share-row .share-check {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.share-weight:disabled,
+.share-input:disabled {
+  opacity: 0.4;
+}
+
+.share-weight-unit {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.share-weight-wrap .share-amount {
+  width: 74px;
+}
+
+/* ---- 收據 ---- */
+.receipt-block {
+  margin-bottom: 12px;
+}
+
+.receipt-block .lb {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.receipt-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.receipt-thumb {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-soft);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.receipt-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* label 當按鈕用：.field label 那條規則會把 display 壓成 block，
+   所以這裡要明確寫回 inline-flex。 */
+.receipt-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* 明細列上的小標記，表示這筆有收據 */
+.receipt-mark {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: var(--color-text-muted);
+}
+
+/* 收據是從編輯 modal 裡點開的，所以要疊在它上面——.modal-backdrop 是 z-index:100，
+   同層的話後面的節點會贏，而這個 viewer 在 DOM 裡排在前面。 */
+.receipt-viewer {
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+  padding: 20px;
+  z-index: 150;
+}
+
+.receipt-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.receipt-viewer-close {
+  position: absolute;
+  top: calc(12px + var(--safe-top));
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ---- 結清了要不要收起來 ---- */
+.settled-banner {
+  background: var(--color-surface);
+  border: 1px solid var(--color-safe);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settled-banner[hidden] {
+  display: none;
+}
+
+.settled-text {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.settled-text .icon {
+  color: var(--color-safe);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.settled-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.settled-actions .btn {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* ---- 已收起來的方案 ---- */
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 14px 2px 10px;
+  margin-top: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.trip-card.archived {
+  opacity: 0.62;
+}
+
 /* ---- Trips ---- */
 .trip-card {
   margin-bottom: 10px;
@@ -1139,7 +1367,7 @@
 .chip-toggle.selected {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
-  color: var(--color-primary-dark);
+  color: var(--color-primary);
   font-weight: 600;
 }
 

@@ -5,7 +5,10 @@ import {
   tripMembers,
   formatTripDates,
   deleteTripSettlement,
+  isTripSettled,
+  setTripArchived,
 } from "../trips.js";
+import { receiptIdSet } from "../receipts.js";
 import {
   listItems,
   addItem,
@@ -67,6 +70,7 @@ function els() {
     clearDoneBtn: document.getElementById("trip-clear-done"),
     addExpenseBtn: document.getElementById("trip-add-expense"),
     moneyBody: document.getElementById("trip-money-body"),
+    settledBanner: document.getElementById("trip-settled-banner"),
   };
 }
 
@@ -154,7 +158,7 @@ async function renderPacking(members) {
 
 /* ---- 帳目 ---- */
 
-function expenseListHtml(acc, cats) {
+function expenseListHtml(acc, cats, withReceipt) {
   if (!acc.expenses.length) {
     return `<div class="empty-state">
       <span class="empty-icon">${icon("receipt", { size: 24 })}</span>
@@ -168,11 +172,14 @@ function expenseListHtml(acc, cats) {
       const payer = split ? acc.members.get(split.payerId).name : "我";
       const count = split ? split.shares.length : 1;
       const total = split ? split.totalAmount : e.amount;
+      const receiptMark = withReceipt.has(e.id)
+        ? `<span class="receipt-mark" title="有收據">${icon("receipt", { size: 13 })}</span>`
+        : "";
       return `<div class="record-item trip-expense-row" data-id="${e.id}">
         ${iconBadge(c.icon, c.color)}
         <div class="meta">
           <div class="name">${escapeHtml(e.note || c.name)}</div>
-          <div class="sub">${e.date} · ${escapeHtml(payer)}先付 · ${count} 人分</div>
+          <div class="sub">${receiptMark}${e.date} · ${escapeHtml(payer)}先付 · ${count} 人分</div>
         </div>
         <div class="amount">${formatMoney(total)}<span class="amount-sub">我的份 ${formatMoney(e.amount)}</span></div>
       </div>`;
@@ -244,9 +251,9 @@ function settlementHtml(acc) {
 
 async function renderMoney(acc) {
   const { moneyBody } = els();
-  const cats = await categoryMap();
+  const [cats, withReceipt] = await Promise.all([categoryMap(), receiptIdSet()]);
   moneyBody.innerHTML =
-    expenseListHtml(acc, cats) + balanceHtml(acc) + transferHtml(acc) + settlementHtml(acc);
+    expenseListHtml(acc, cats, withReceipt) + balanceHtml(acc) + transferHtml(acc) + settlementHtml(acc);
 
   moneyBody.querySelectorAll(".trip-expense-row").forEach((row) => {
     row.addEventListener("click", () => {
@@ -276,6 +283,40 @@ async function renderMoney(acc) {
       showToast("已刪除結清紀錄");
       await render();
     });
+  });
+}
+
+/* ---- 結清了就問要不要收起來 ---- */
+
+/* 按過「先不要」的方案這次開著就別再問了。只記在記憶體裡：
+   重開 App 又結清著，再問一次也合理。 */
+const dismissed = new Set();
+
+function renderSettledBanner(acc) {
+  const { settledBanner } = els();
+  const show = isTripSettled(acc) && !currentTrip.archivedAt && !dismissed.has(currentTrip.id);
+  settledBanner.hidden = !show;
+  if (!show) return;
+
+  settledBanner.innerHTML = `
+    <div class="settled-text">
+      ${icon("check", { size: 16 })}
+      <span>這趟的帳都結清了。要把方案收起來嗎？收起來只是不顯示在列表上，資料都留著。</span>
+    </div>
+    <div class="settled-actions">
+      <button type="button" class="btn btn-ghost" id="trip-settled-later">先不要</button>
+      <button type="button" class="btn btn-primary" id="trip-settled-archive">收起來</button>
+    </div>`;
+
+  settledBanner.querySelector("#trip-settled-later").addEventListener("click", () => {
+    dismissed.add(currentTrip.id);
+    settledBanner.hidden = true;
+  });
+
+  settledBanner.querySelector("#trip-settled-archive").addEventListener("click", async () => {
+    await setTripArchived(currentTrip.id, true);
+    showToast("已收起來，在方案列表最下面找得到");
+    navigate("/trips");
   });
 }
 
@@ -316,6 +357,7 @@ async function render() {
     acc.myNet > 0 ? "別人要還我" : acc.myNet < 0 ? "我要還別人" : "已結清";
 
   renderPaneVisibility();
+  renderSettledBanner(acc);
   await renderPacking(members);
   await renderMoney(acc);
 }
@@ -366,8 +408,8 @@ function wire() {
 
   editBtn.addEventListener("click", () => {
     if (!currentTrip) return;
-    openTripEditor(currentTrip, (updated) => {
-      if (updated) render();
+    openTripEditor(currentTrip, (updated, opts) => {
+      if (updated && !opts?.archived) render();
       else navigate("/trips");
     });
   });
