@@ -1,6 +1,7 @@
 import { listCategories } from "../categories.js";
 import { getBudget, setBudget, TOTAL_BUDGET_ID } from "../budgets.js";
 import { exportJSON, exportCSV, importJSON } from "../exportImport.js";
+import { countReceipts } from "../receipts.js";
 import { showToast, escapeHtml } from "../ui.js";
 import { openCategoryCreator, openCategoryEditor } from "../categoryModal.js";
 import { icon, iconBadge } from "../icons.js";
@@ -18,6 +19,7 @@ function els() {
     totalBudget: document.getElementById("more-total-budget"),
     exportJsonBtn: document.getElementById("more-export-json"),
     exportCsvBtn: document.getElementById("more-export-csv"),
+    receiptNote: document.getElementById("more-receipt-note"),
     importFile: document.getElementById("more-import-file"),
   };
 }
@@ -101,10 +103,21 @@ function wire() {
   });
 }
 
+/* 收據沒進備份，有存照片的人一定要知道這件事，不然還原完會以為照片被吃掉了。 */
+async function renderReceiptNote() {
+  const { receiptNote } = els();
+  const n = await countReceipts();
+  receiptNote.hidden = n === 0;
+  if (n) {
+    receiptNote.textContent = `注意：${n} 張收據照片不會進備份檔（照片太大，會讓備份從幾十 KB 變成幾十 MB）。換手機的話收據不會跟著過去。`;
+  }
+}
+
 export async function onShow() {
   wire();
   const { totalBudget } = els();
   const b = await getBudget(TOTAL_BUDGET_ID);
   totalBudget.value = b || "";
   await refresh();
+  await renderReceiptNote();
 }

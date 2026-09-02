@@ -2,10 +2,12 @@ import { listCategories } from "./categories.js";
 import { updateExpense, deleteExpense } from "./expenses.js";
 import { openModal, closeModal, showToast } from "./ui.js";
 import { starsInput, wireStars, getStars, RATING_LABELS } from "./rating.js";
+import { mountReceiptField } from "./receiptField.js";
 
 let onDoneCallback = null;
 let currentId = null;
 let categories = [];
+let receiptField = null;
 let wired = false;
 
 function els() {
@@ -21,6 +23,7 @@ function els() {
     ratingBox: document.getElementById("edit-rating-box"),
     ratingStars: document.getElementById("edit-rating-stars"),
     ratingLabel: document.getElementById("edit-rating-label"),
+    receipt: document.getElementById("edit-receipt"),
   };
 }
 
@@ -54,7 +57,9 @@ function currentRating() {
 function wire() {
   if (wired) return;
   wired = true;
-  const { save, del, cancel, category } = els();
+  const { save, del, cancel, category, receipt } = els();
+
+  receiptField = mountReceiptField(receipt);
 
   category.addEventListener("change", () => renderRating(currentRating()));
 
@@ -76,6 +81,7 @@ function wire() {
       note: note.value,
       rating: currentRating(),
     });
+    await receiptField.commit(currentId);
     closeModal("expense-modal");
     showToast("已儲存");
     onDoneCallback && onDoneCallback();
@@ -108,5 +114,6 @@ export async function openExpenseEditor(expense, onDone) {
   }
   await populateCategories(expense.categoryId);
   renderRating(expense.rating || 0);
+  await receiptField.load(currentId);
   openModal("expense-modal");
 }

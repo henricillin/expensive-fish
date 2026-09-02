@@ -1,11 +1,12 @@
 /* 新增／編輯方案：名稱、日期、同行成員。 */
-import { createTrip, updateTrip, deleteTrip } from "./trips.js";
+import { createTrip, updateTrip, deleteTrip, setTripArchived } from "./trips.js";
 import { listPeople } from "./people.js";
 import { openPersonCreator } from "./personModal.js";
 import { openModal, closeModal, showToast, escapeHtml } from "./ui.js";
 
 let mode = "create";
 let editingId = null;
+let archivedNow = false;
 let selectedMembers = new Set();
 let onDoneCallback = null;
 let wired = false;
@@ -20,6 +21,7 @@ function els() {
     addPerson: document.getElementById("trip-add-person"),
     save: document.getElementById("trip-save"),
     del: document.getElementById("trip-delete"),
+    archive: document.getElementById("trip-archive"),
     cancel: document.getElementById("trip-cancel"),
   };
 }
@@ -51,7 +53,16 @@ async function renderMembers() {
 function wire() {
   if (wired) return;
   wired = true;
-  const { save, del, cancel, name, addPerson } = els();
+  const { save, del, cancel, name, addPerson, archive } = els();
+
+  archive.addEventListener("click", async () => {
+    const nowArchived = !archivedNow;
+    const trip = await setTripArchived(editingId, nowArchived);
+    closeModal("trip-modal");
+    showToast(nowArchived ? "已收起來，在方案列表最下面找得到" : "已重新打開");
+    /* 收起來之後留在這個方案的頁面上很怪——它已經不在列表裡了，所以退回列表。 */
+    onDoneCallback && onDoneCallback(trip, { archived: nowArchived });
+  });
 
   save.addEventListener("click", async () => {
     const { name: nameEl, start, end } = els();
@@ -104,7 +115,9 @@ export async function openTripCreator(onDone) {
   editingId = null;
   onDoneCallback = onDone;
   selectedMembers = new Set();
-  const { title, name, start, end, del } = els();
+  const { title, name, start, end, del, archive } = els();
+  archivedNow = false;
+  archive.hidden = true;
   title.textContent = "新增方案";
   name.value = "";
   start.value = "";
@@ -121,7 +134,10 @@ export async function openTripEditor(trip, onDone) {
   editingId = trip.id;
   onDoneCallback = onDone;
   selectedMembers = new Set(trip.memberIds || []);
-  const { title, name, start, end, del } = els();
+  const { title, name, start, end, del, archive } = els();
+  archivedNow = Boolean(trip.archivedAt);
+  archive.hidden = false;
+  archive.textContent = archivedNow ? "重新打開這個方案" : "把這個方案收起來";
   title.textContent = "編輯方案";
   name.value = trip.name;
   start.value = trip.startDate || "";

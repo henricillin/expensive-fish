@@ -190,6 +190,7 @@
         <button class="btn btn-block" id="more-export-csv" style="margin-bottom:8px;">匯出 CSV（試算表用）</button>
         <label class="btn btn-block" for="more-import-file">匯入 JSON 備份還原</label>
         <input type="file" id="more-import-file" accept="application/json" hidden />
+        <p class="settings-desc" id="more-receipt-note" style="margin:10px 0 0;" hidden></p>
       </div>
     </div>
   </section>
@@ -210,6 +211,11 @@
       <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
     </div>
     <div id="trips-container"></div>
+
+    <div id="trips-archived-section" hidden>
+      <button type="button" class="archive-toggle" id="trips-archived-toggle" aria-expanded="false"></button>
+      <div id="trips-archived-container" hidden></div>
+    </div>
   </section>
 
   <!-- One trip: packing list + who owes who (reached from the trips tab) -->
@@ -236,6 +242,8 @@
         </div>
       </div>
     </div>
+
+    <div class="settled-banner" id="trip-settled-banner" hidden></div>
 
     <div id="trip-pane-money">
       <div class="card-row" style="margin-bottom:12px;">
@@ -317,6 +325,7 @@
       <label for="edit-note">備註</label>
       <input id="edit-note" type="text" maxlength="60" />
     </div>
+    <div class="receipt-block" id="edit-receipt"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="edit-delete">刪除</button>
       <button class="btn btn-primary" id="edit-save">儲存</button>
@@ -377,9 +386,10 @@
     </div>
     <div class="field">
       <label>分帳方式</label>
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="btn method-btn selected" data-method="equal" style="flex:1;">平均分攤</button>
-        <button type="button" class="btn method-btn" data-method="custom" style="flex:1;">自訂金額</button>
+      <div class="method-row">
+        <button type="button" class="btn method-btn selected" data-method="equal">平均</button>
+        <button type="button" class="btn method-btn" data-method="shares">份數</button>
+        <button type="button" class="btn method-btn" data-method="custom">自訂金額</button>
       </div>
     </div>
     <div class="card-row" id="split-summary" style="font-size:13px;"></div>
@@ -420,11 +430,18 @@
       <button class="btn btn-danger" id="trip-delete" hidden>刪除</button>
       <button class="btn btn-primary" id="trip-save">儲存</button>
     </div>
+    <button class="btn btn-ghost btn-block" id="trip-archive" hidden style="margin-top:8px;"></button>
     <button class="btn btn-ghost btn-block" id="trip-cancel" style="margin-top:8px;">取消</button>
   </div>
 </div>
 
 <!-- Trip expense modal -->
+<!-- 收據看大圖：點畫面任一處關掉 -->
+<div class="modal-backdrop receipt-viewer" id="receipt-viewer" hidden>
+  <button type="button" class="receipt-viewer-close" aria-label="關閉"></button>
+  <img id="receipt-viewer-image" alt="收據" />
+</div>
+
 <div class="modal-backdrop" id="trip-expense-modal" hidden>
   <div class="modal-sheet">
     <h2 id="trip-expense-title">新增花費</h2>
@@ -452,13 +469,15 @@
     </div>
     <div class="field">
       <label>誰要分</label>
-      <div style="display:flex;gap:8px;margin-bottom:4px;">
-        <button type="button" class="btn method-btn selected" data-method="equal" style="flex:1;">平均分攤</button>
-        <button type="button" class="btn method-btn" data-method="custom" style="flex:1;">自訂金額</button>
+      <div class="method-row" style="margin-bottom:4px;">
+        <button type="button" class="btn method-btn selected" data-method="equal">平均</button>
+        <button type="button" class="btn method-btn" data-method="shares">份數</button>
+        <button type="button" class="btn method-btn" data-method="custom">自訂金額</button>
       </div>
       <div id="trip-expense-participants"></div>
     </div>
     <div class="card-row" id="trip-expense-summary" style="font-size:13px;"></div>
+    <div class="receipt-block" id="trip-expense-receipt"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="trip-expense-delete" hidden>刪除</button>
       <button class="btn btn-primary" id="trip-expense-save">儲存</button>

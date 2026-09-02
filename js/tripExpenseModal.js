@@ -1,10 +1,18 @@
-/* 方案裡的一筆花費：總金額、誰先付、怎麼分。
+/* 方案裡的一筆花費：總金額、誰先付、怎麼分、收據照片。
    存進支出時，amount 只放「我的份」，總額留在 split 裡，月結算才不會被別人的份灌水。 */
 import { listCategories } from "./categories.js";
 import { createExpense, updateExpense, deleteExpense, todayISO } from "./expenses.js";
 import { tripMembers } from "./trips.js";
 import { ME } from "./people.js";
 import { openModal, closeModal, showToast, formatMoney, escapeHtml } from "./ui.js";
+import { sharesFor, sumShares } from "./split.js";
+import {
+  participantRow,
+  splitMethodFields,
+  restoreSplitMethod,
+  updateShareAmounts,
+} from "./splitUI.js";
+import { mountReceiptField } from "./receiptField.js";
 
 let currentTrip = null;
 let editingExpense = null;
@@ -13,6 +21,8 @@ let members = { options: [ME], ids: [ME.id] };
 let selected = new Set([ME.id]);
 let method = "equal";
 let customAmounts = {};
+let weights = {};
+let receiptField = null;
 let wired = false;
 
 function els() {
@@ -26,31 +36,21 @@ function els() {
     participants: document.getElementById("trip-expense-participants"),
     methodBtns: document.querySelectorAll("#trip-expense-modal .method-btn"),
     summary: document.getElementById("trip-expense-summary"),
+    receipt: document.getElementById("trip-expense-receipt"),
     save: document.getElementById("trip-expense-save"),
     del: document.getElementById("trip-expense-delete"),
     cancel: document.getElementById("trip-expense-cancel"),
   };
 }
 
-function equalShares(total, ids) {
-  const n = ids.length;
-  if (n === 0) return {};
-  const base = Math.floor(total / n);
-  const remainder = Math.round(total - base * n);
-  const shares = {};
-  ids.forEach((id, i) => {
-    shares[id] = base + (i < remainder ? 1 : 0);
-  });
-  return shares;
-}
-
 function currentShares() {
-  const total = Number(els().total.value) || 0;
-  const ids = [...selected];
-  if (method === "equal") return equalShares(total, ids);
-  const shares = {};
-  for (const id of ids) shares[id] = Number(customAmounts[id]) || 0;
-  return shares;
+  return sharesFor({
+    method,
+    total: Number(els().total.value) || 0,
+    ids: [...selected],
+    customAmounts,
+    weights,
+  });
 }
 
 function renderPayer(selectedId) {
@@ -72,22 +72,9 @@ async function renderCategories(selectedId) {
 
 function renderParticipants() {
   const { participants } = els();
-  const shares = method === "custom" ? null : currentShares();
+  const shares = currentShares();
   participants.innerHTML = members.options
-    .map((p) => {
-      const checked = selected.has(p.id);
-      const amountField =
-        method === "custom"
-          ? `<input type="number" inputmode="decimal" min="0" step="1" class="share-input" data-id="${p.id}" value="${customAmounts[p.id] ?? ""}" placeholder="0" ${checked ? "" : "disabled"} />`
-          : `<span class="share-amount">${checked ? formatMoney(shares[p.id] || 0) : ""}</span>`;
-      return `<div class="card-row" style="padding:6px 0;">
-        <label style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
-          <input type="checkbox" class="share-check" data-id="${p.id}" ${checked ? "checked" : ""} />
-          <span>${escapeHtml(p.name)}</span>
-        </label>
-        ${amountField}
-      </div>`;
-    })
+    .map((p) => participantRow(p, selected.has(p.id), method, shares, customAmounts, weights))
     .join("");
 
   participants.querySelectorAll(".share-check").forEach((cb) => {
@@ -105,13 +92,21 @@ function renderParticipants() {
       renderSummary();
     });
   });
+
+  participants.querySelectorAll(".share-weight").forEach((input) => {
+    input.addEventListener("input", () => {
+      weights[input.dataset.id] = input.value;
+      updateShareAmounts(participants, currentShares(), selected);
+      renderSummary();
+    });
+  });
 }
 
 function renderSummary() {
   const { summary, total } = els();
   const totalAmount = Number(total.value) || 0;
   const shares = currentShares();
-  const sum = [...selected].reduce((s, id) => s + (shares[id] || 0), 0);
+  const sum = sumShares(shares, [...selected]);
   if (method === "custom" && sum !== totalAmount) {
     summary.innerHTML = `<span style="color:var(--color-danger)">已分配 ${formatMoney(sum)}，與總額 ${formatMoney(totalAmount)} 不符</span>`;
   } else {
@@ -122,7 +117,9 @@ function renderSummary() {
 function wire() {
   if (wired) return;
   wired = true;
-  const { total, methodBtns, save, del, cancel } = els();
+  const { total, methodBtns, save, del, cancel, receipt } = els();
+
+  receiptField = mountReceiptField(receipt);
 
   total.addEventListener("input", () => {
     renderParticipants();
@@ -150,7 +147,7 @@ function wire() {
       return;
     }
     const shares = currentShares();
-    const sum = [...selected].reduce((s, id) => s + (shares[id] || 0), 0);
+    const sum = sumShares(shares, [...selected]);
     if (method === "custom" && sum !== totalAmount) {
       showToast("自訂金額加總要等於總金額");
       return;
@@ -159,6 +156,7 @@ function wire() {
       totalAmount,
       payerId: els().payer.value,
       shares: [...selected].map((id) => ({ personId: id, amount: shares[id] || 0 })),
+      ...splitMethodFields(method, selected, weights),
     };
     const payload = {
       amount: shares[ME.id] || 0,
@@ -167,11 +165,11 @@ function wire() {
       note: note.value,
       split,
     };
-    if (editingExpense) {
-      await updateExpense(editingExpense.id, payload);
-    } else {
-      await createExpense({ ...payload, tripId: currentTrip.id });
-    }
+    /* 新增時要先有 id 才存得了收據，所以照片一律在支出寫完之後才 commit */
+    const saved = editingExpense
+      ? await updateExpense(editingExpense.id, payload)
+      : await createExpense({ ...payload, tripId: currentTrip.id });
+    await receiptField.commit(saved.id);
     closeModal("trip-expense-modal");
     showToast(editingExpense ? "已儲存" : "已記一筆");
     onDoneCallback && onDoneCallback();
@@ -215,7 +213,7 @@ export async function openTripExpenseModal(trip, expense, onDone) {
     customAmounts = split
       ? Object.fromEntries(split.shares.map((s) => [s.personId, s.amount]))
       : {};
-    method = "custom";
+    ({ method, weights } = restoreSplitMethod(split));
     del.hidden = false;
     await renderCategories(editingExpense.categoryId);
     renderPayer(split ? split.payerId : ME.id);
@@ -226,6 +224,7 @@ export async function openTripExpenseModal(trip, expense, onDone) {
     date.value = defaultDate(trip);
     selected = new Set(members.ids);
     customAmounts = {};
+    weights = {};
     method = "equal";
     del.hidden = true;
     await renderCategories(null);
@@ -235,5 +234,6 @@ export async function openTripExpenseModal(trip, expense, onDone) {
   methodBtns.forEach((b) => b.classList.toggle("selected", b.dataset.method === method));
   renderParticipants();
   renderSummary();
+  await receiptField.load(editingExpense ? editingExpense.id : null);
   openModal("trip-expense-modal");
 }

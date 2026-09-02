@@ -1,5 +1,5 @@
 const DB_NAME = "expenseTrackerDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export const STORE_CATEGORIES = "categories";
 export const STORE_EXPENSES = "expenses";
@@ -11,6 +11,9 @@ export const STORE_TRIP_SETTLEMENTS = "tripSettlements";
 /* 攜帶清單的項目。欄位仍叫 listId，值是方案 id（v4 之前是清單 id，兩者相同）。 */
 export const STORE_PACKING_LISTS = "packingLists";
 export const STORE_PACKING_ITEMS = "packingItems";
+/* 收據照片。一筆支出最多一張，所以直接用 expenseId 當 key。
+   值是壓縮過的 Blob，刻意跟 expenses 分開存——不然每次列支出都會把照片一起讀進記憶體。 */
+export const STORE_RECEIPTS = "receipts";
 
 let dbPromise = null;
 
@@ -92,6 +95,12 @@ function openDB() {
         });
         tripSettlements.createIndex("tripId", "tripId", { unique: false });
       }
+
+      /* v5：收據照片。方案封存（trips.archivedAt）不用 migration——
+         沒有這個欄位就當成沒封存，normalize() 補上預設值。 */
+      if (!db.objectStoreNames.contains(STORE_RECEIPTS)) {
+        db.createObjectStore(STORE_RECEIPTS, { keyPath: "expenseId" });
+      }
     };
 
     req.onsuccess = () => {
@@ -158,6 +167,10 @@ export async function getAllByIndex(storeName, indexName, query) {
   return tx(storeName, "readonly", (store) =>
     reqToPromise(store.index(indexName).getAll(query))
   );
+}
+
+export async function getAllKeys(storeName) {
+  return tx(storeName, "readonly", (store) => reqToPromise(store.getAllKeys()));
 }
 
 export async function countStore(storeName) {

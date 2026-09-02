@@ -36,6 +36,13 @@
   box-sizing: border-box;
 }
 
+/* hidden 要贏過元件自己的 display。瀏覽器預設的 [hidden]{display:none} 只是
+   一條 type 選擇器等級的規則，任何 class（.btn 是 inline-flex、.btn-block 是 flex）
+   都蓋得掉它——「新增花費」上面本來就會冒出一顆不該在的刪除鍵，就是這樣來的。 */
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;

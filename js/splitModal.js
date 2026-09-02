@@ -1,12 +1,20 @@
 import { listPeople, ME } from "./people.js";
 import { openModal, closeModal, showToast, formatMoney, escapeHtml } from "./ui.js";
 import { openPersonCreator } from "./personModal.js";
+import { sharesFor, sumShares } from "./split.js";
+import {
+  participantRow,
+  splitMethodFields,
+  restoreSplitMethod,
+  updateShareAmounts,
+} from "./splitUI.js";
 
 let onApplyCallback = null;
 let wired = false;
 let selected = new Set([ME.id]);
 let method = "equal";
 let customAmounts = {};
+let weights = {};
 let allPeople = [ME];
 
 function els() {
@@ -22,57 +30,33 @@ function els() {
   };
 }
 
-function equalShares(total, ids) {
-  const n = ids.length;
-  if (n === 0) return {};
-  const base = Math.floor(total / n);
-  let remainder = Math.round(total - base * n);
-  const shares = {};
-  ids.forEach((id, i) => {
-    shares[id] = base + (i < remainder ? 1 : 0);
-  });
-  return shares;
-}
-
 function currentShares() {
-  const total = Number(els().total.value) || 0;
-  const ids = [...selected];
-  if (method === "equal") {
-    return equalShares(total, ids);
-  }
-  const shares = {};
-  for (const id of ids) shares[id] = Number(customAmounts[id]) || 0;
-  return shares;
+  return sharesFor({
+    method,
+    total: Number(els().total.value) || 0,
+    ids: [...selected],
+    customAmounts,
+    weights,
+  });
 }
 
 function renderPayerSelect() {
   const { payer } = els();
   const prev = payer.value;
-  payer.innerHTML = allPeople.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  payer.innerHTML = allPeople
+    .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
+    .join("");
   payer.value = allPeople.some((p) => p.id === prev) ? prev : ME.id;
 }
 
 function renderParticipants() {
   const { participants } = els();
-  const shares = method === "custom" ? null : currentShares();
+  const shares = currentShares();
   participants.innerHTML = allPeople
-    .map((p) => {
-      const checked = selected.has(p.id);
-      const amountField =
-        method === "custom"
-          ? `<input type="number" inputmode="decimal" min="0" step="1" class="split-amount-input" data-id="${p.id}" value="${customAmounts[p.id] ?? ""}" placeholder="0" ${checked ? "" : "disabled"} style="width:80px;text-align:right;border:1px solid var(--color-border);border-radius:8px;padding:6px 8px;" />`
-          : `<span style="width:80px;text-align:right;display:inline-block;">${checked ? formatMoney(shares[p.id] || 0) : ""}</span>`;
-      return `<div class="card-row" style="padding:6px 0;">
-        <label style="display:flex;align-items:center;gap:8px;flex-shrink:0;white-space:nowrap;">
-          <input type="checkbox" class="split-participant-check" data-id="${p.id}" ${checked ? "checked" : ""} />
-          <span>${escapeHtml(p.name)}</span>
-        </label>
-        ${amountField}
-      </div>`;
-    })
+    .map((p) => participantRow(p, selected.has(p.id), method, shares, customAmounts, weights))
     .join("");
 
-  participants.querySelectorAll(".split-participant-check").forEach((cb) => {
+  participants.querySelectorAll(".share-check").forEach((cb) => {
     cb.addEventListener("change", () => {
       if (cb.checked) selected.add(cb.dataset.id);
       else selected.delete(cb.dataset.id);
@@ -81,9 +65,17 @@ function renderParticipants() {
     });
   });
 
-  participants.querySelectorAll(".split-amount-input").forEach((input) => {
+  participants.querySelectorAll(".share-input").forEach((input) => {
     input.addEventListener("input", () => {
       customAmounts[input.dataset.id] = input.value;
+      renderSummary();
+    });
+  });
+
+  participants.querySelectorAll(".share-weight").forEach((input) => {
+    input.addEventListener("input", () => {
+      weights[input.dataset.id] = input.value;
+      updateShareAmounts(participants, currentShares(), selected);
       renderSummary();
     });
   });
@@ -93,7 +85,7 @@ function renderSummary() {
   const { summary, total } = els();
   const totalAmount = Number(total.value) || 0;
   const shares = currentShares();
-  const sum = [...selected].reduce((s, id) => s + (shares[id] || 0), 0);
+  const sum = sumShares(shares, [...selected]);
   const myShare = shares[ME.id] || 0;
   if (method === "custom" && sum !== totalAmount) {
     summary.innerHTML = `<span style="color:var(--color-danger)">已分配 ${formatMoney(sum)}，與總額 ${formatMoney(totalAmount)} 不符</span>`;
@@ -147,7 +139,7 @@ function wire() {
       return;
     }
     const shares = currentShares();
-    const sum = [...selected].reduce((s, id) => s + (shares[id] || 0), 0);
+    const sum = sumShares(shares, [...selected]);
     if (method === "custom" && sum !== totalAmount) {
       showToast("自訂金額加總要等於帳單總額");
       return;
@@ -156,7 +148,14 @@ function wire() {
     const shareList = [...selected].map((id) => ({ personId: id, amount: shares[id] || 0 }));
     const myShare = shares[ME.id] || 0;
     closeModal("split-modal");
-    onApplyCallback && onApplyCallback({ totalAmount, payerId, shares: shareList, myShare });
+    onApplyCallback &&
+      onApplyCallback({
+        totalAmount,
+        payerId,
+        shares: shareList,
+        myShare,
+        ...splitMethodFields(method, selected, weights),
+      });
   });
 
   cancel.addEventListener("click", () => closeModal("split-modal"));
@@ -170,10 +169,11 @@ export async function openSplitModal({ prefillTotal, existingSplit } = {}, onApp
   if (existingSplit) {
     selected = new Set(existingSplit.shares.map((s) => s.personId));
     customAmounts = Object.fromEntries(existingSplit.shares.map((s) => [s.personId, s.amount]));
-    method = "custom";
+    ({ method, weights } = restoreSplitMethod(existingSplit));
   } else {
     selected = new Set([ME.id]);
     customAmounts = {};
+    weights = {};
     method = "equal";
   }
 

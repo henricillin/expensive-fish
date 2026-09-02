@@ -26,6 +26,9 @@ function downloadBlob(content, filename, mime) {
   URL.revokeObjectURL(url);
 }
 
+/* 收據照片刻意不進備份：JSON.stringify 碰到 Blob 會安靜地變成 {}，
+   就算改成 base64，幾十張照片也會讓備份檔從幾十 KB 變成幾十 MB。
+   更多頁的說明有寫這件事。 */
 export async function exportJSON() {
   const [categories, expenses, budgets, people, settlements, trips, tripSettlements, packingItems] =
     await Promise.all([

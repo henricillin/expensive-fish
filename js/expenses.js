@@ -7,6 +7,7 @@ import {
   remove,
   getAllByIndex,
 } from "./db.js";
+import { deleteReceipt } from "./receipts.js";
 
 export function todayISO() {
   const d = new Date();
@@ -82,6 +83,8 @@ export async function updateExpense(id, changes) {
 
 export async function deleteExpense(id) {
   await remove(STORE_EXPENSES, id);
+  /* 收據是另一個 store，不跟著刪就會變成永遠讀不到的孤兒資料 */
+  await deleteReceipt(id);
 }
 
 export async function monthTotal(yearMonth) {
