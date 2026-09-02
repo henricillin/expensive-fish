@@ -1,5 +1,5 @@
 import { listCategories, categoryMap } from "../categories.js";
-import { createExpense, listExpenses, todayISO } from "../expenses.js";
+import { createExpense, listExpenses, todayISO, dateToISO } from "../expenses.js";
 import { showToast, formatMoney, escapeHtml } from "../ui.js";
 import { openExpenseEditor } from "../expenseModal.js";
 import { openSplitModal } from "../splitModal.js";
@@ -25,6 +25,10 @@ function els() {
     ratingStars: document.getElementById("home-rating-stars"),
     ratingLabel: document.getElementById("home-rating-label"),
     date: document.getElementById("home-date"),
+    datePrev: document.getElementById("home-date-prev"),
+    dateNext: document.getElementById("home-date-next"),
+    dateText: document.getElementById("home-date-text"),
+    dateRel: document.getElementById("home-date-rel"),
     note: document.getElementById("home-note"),
     save: document.getElementById("home-save"),
     recent: document.getElementById("home-recent-list"),
@@ -33,6 +37,45 @@ function els() {
 
 function selectedCategory() {
   return categories.find((c) => c.id === selectedCategoryId) || null;
+}
+
+/* ---- 日期那一條 ---- */
+
+const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+
+/* ISO 字串直接拆數字再組 Date，不要用 new Date("2026-09-02")——那會被當 UTC，
+   在台灣時區（UTC+8）解析出來還是同一天，但換算成本地日期會早 8 小時，跨月時會差一天。 */
+function isoToDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function shiftDate(iso, days) {
+  const d = isoToDate(iso);
+  d.setDate(d.getDate() + days);
+  return dateToISO(d);
+}
+
+/* 今天／昨天／明天講得出口就講，其他日子報星期幾 */
+function relativeLabel(iso) {
+  const today = isoToDate(todayISO());
+  const target = isoToDate(iso);
+  const diff = Math.round((target - today) / 86400000);
+  if (diff === 0) return "今天";
+  if (diff === -1) return "昨天";
+  if (diff === -2) return "前天";
+  if (diff === 1) return "明天";
+  return `週${WEEKDAYS[target.getDay()]}`;
+}
+
+function renderDate() {
+  const { date, dateText, dateRel, dateNext } = els();
+  if (!date.value) date.value = todayISO();
+  const d = isoToDate(date.value);
+  dateText.textContent = `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  dateRel.textContent = relativeLabel(date.value);
+  /* 記帳只會往回補，不會記未來的花費 */
+  dateNext.disabled = date.value >= todayISO();
 }
 
 function renderRatingBox(value = 0) {
@@ -135,7 +178,25 @@ async function renderRecent() {
 function wireForm() {
   if (wired) return;
   wired = true;
-  const { amount, date, note, save, splitToggle } = els();
+  const { amount, date, note, save, splitToggle, datePrev, dateNext } = els();
+
+  datePrev.innerHTML = icon("chevronLeft", { size: 18 });
+  dateNext.innerHTML = icon("chevronRight", { size: 18 });
+
+  datePrev.addEventListener("click", () => {
+    date.value = shiftDate(date.value || todayISO(), -1);
+    renderDate();
+  });
+
+  dateNext.addEventListener("click", () => {
+    const next = shiftDate(date.value || todayISO(), 1);
+    if (next > todayISO()) return;
+    date.value = next;
+    renderDate();
+  });
+
+  /* 透明的原生 input 疊在文字上，點文字等於點它 */
+  date.addEventListener("change", renderDate);
 
   splitToggle.addEventListener("click", () => {
     openSplitModal(
@@ -171,6 +232,7 @@ function wireForm() {
     note.value = "";
     currentSplit = null;
     renderSplitSummary();
+    renderDate();
     renderRatingBox(0);
     showToast("已記錄一筆");
     await renderRecent();
@@ -182,6 +244,7 @@ export async function onShow() {
   const { date } = els();
   if (!date.value) date.value = todayISO();
   wireForm();
+  renderDate();
   initSummary();
   renderSplitSummary();
   await renderCategoryGrid();

@@ -1,25 +1,31 @@
+/* 「深夜」主題：底色是深紫黑，卡片再亮一階，分類自己的飽和色才跳得出來。
+   整支 App 只有這一套配色，所以直接寫在 :root，沒有淺色版可切。 */
 :root {
-  --color-bg: #faf8f5;
-  --color-surface: #ffffff;
-  --color-soft: #f5f0e9;
-  --color-text: #201a14;
-  --color-text-muted: #7a7168;
-  --color-border: #ece5db;
+  color-scheme: dark;
+
+  --color-bg: #17131f;
+  --color-surface: #221c2e;
+  --color-soft: #2c2539;
+  --color-text: #f4eefb;
+  --color-text-muted: #a99bbd;
+  --color-border: #352c45;
   --color-primary: #ff6b35;
   --color-primary-dark: #e2531f;
-  --color-primary-soft: #fff1ea;
+  --color-primary-soft: #3a2233;
   --color-accent: #2ec4b6;
   --color-yellow: #ffbc42;
   --color-star: #f5a524;
-  --color-danger: #e63946;
+  --color-danger: #ff5a67;
   --color-safe: #2ec4b6;
   --color-warn: #ffbc42;
-  --color-over: #e63946;
+  --color-over: #ff5a67;
+  /* 深底上的「淡一階」灰，給星星空心、開關軌道這種要看得到但不能搶戲的東西 */
+  --color-dim: #4b415f;
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-full: 999px;
-  --shadow-card: 0 2px 10px rgba(32, 26, 20, 0.06);
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.35);
   --header-height: 52px;
   --tabbar-height: 60px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -71,7 +77,7 @@ button, input, select {
   right: 0;
   z-index: 60;
   padding-top: var(--safe-top);
-  background: rgba(250, 248, 245, 0.86);
+  background: rgba(23, 19, 31, 0.86);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid transparent;

@@ -1,4 +1,4 @@
-/* 一個方案的內容：上面是這趟的概況，下面切「攜帶清單」和「帳目」兩頁。 */
+/* 一個方案的內容：上面是這趟的概況，主體是算帳；攜帶清單收在一列入口後面，點了才展開。 */
 import {
   getTrip,
   computeTripAccounts,
@@ -30,13 +30,13 @@ export const back = "/trips";
 
 let currentTripId = null;
 let currentTrip = null;
-let pane = "list";
+let pane = "money";
 let groupMode = "item";
 let wired = false;
 
 export function setCurrentTrip(id) {
   currentTripId = id;
-  pane = "list";
+  pane = "money";
 }
 
 function els() {
@@ -49,9 +49,14 @@ function els() {
     statMine: document.getElementById("trip-stat-mine"),
     statNet: document.getElementById("trip-stat-net"),
     statNetLabel: document.getElementById("trip-stat-net-label"),
-    paneSwitch: document.getElementById("trip-pane-switch"),
     paneList: document.getElementById("trip-pane-list"),
     paneMoney: document.getElementById("trip-pane-money"),
+    packingEntry: document.getElementById("trip-packing-entry"),
+    entryIcon: document.getElementById("trip-packing-entry-icon"),
+    entrySub: document.getElementById("trip-packing-entry-sub"),
+    entryArrow: document.getElementById("trip-packing-entry-arrow"),
+    entryFill: document.getElementById("trip-packing-entry-fill"),
+    backToMoney: document.getElementById("trip-back-to-money"),
     progress: document.getElementById("trip-progress"),
     itemCount: document.getElementById("trip-item-count"),
     input: document.getElementById("trip-new-item"),
@@ -99,13 +104,18 @@ function groupedHtml(items, members) {
 }
 
 async function renderPacking(members) {
-  const { progress, itemCount, itemList, clearDoneBtn, uncheckAllBtn } = els();
+  const { progress, itemCount, itemList, clearDoneBtn, uncheckAllBtn, entrySub, entryFill } = els();
   const items = await listItems(currentTripId);
   const { total, done } = progressOf(items);
+  const pct = total ? Math.round((done / total) * 100) : 0;
 
   itemCount.textContent = total ? `已準備 ${done} / ${total}` : "還沒有項目";
-  progress.style.width = total ? `${Math.round((done / total) * 100)}%` : "0%";
+  progress.style.width = `${pct}%`;
   progress.classList.toggle("done", total > 0 && done === total);
+
+  entrySub.textContent = total ? `已準備 ${done} / ${total}` : "還沒有項目，點進去加";
+  entryFill.style.width = `${pct}%`;
+  entryFill.classList.toggle("done", total > 0 && done === total);
   clearDoneBtn.disabled = done === 0;
   uncheckAllBtn.disabled = done === 0;
 
@@ -311,12 +321,9 @@ async function render() {
 }
 
 function renderPaneVisibility() {
-  const { paneSwitch, paneList, paneMoney } = els();
+  const { paneList, paneMoney } = els();
   paneList.hidden = pane !== "list";
   paneMoney.hidden = pane !== "money";
-  paneSwitch.querySelectorAll("button").forEach((b) => {
-    b.classList.toggle("selected", b.dataset.pane === pane);
-  });
 }
 
 async function submitNewItem() {
@@ -340,7 +347,10 @@ function wire() {
     editBtn,
     addItemBtn,
     input,
-    paneSwitch,
+    packingEntry,
+    entryIcon,
+    entryArrow,
+    backToMoney,
     groupSwitch,
     clearDoneBtn,
     uncheckAllBtn,
@@ -350,6 +360,9 @@ function wire() {
   editBtn.innerHTML = `${icon("pencil", { size: 16 })}<span>編輯</span>`;
   addItemBtn.innerHTML = icon("plus", { size: 20 });
   addExpenseBtn.innerHTML = `${icon("plus", { size: 16 })}<span>新增花費</span>`;
+  entryIcon.innerHTML = icon("list", { size: 18 });
+  entryArrow.innerHTML = icon("chevronRight", { size: 16 });
+  backToMoney.innerHTML = `${icon("chevronLeft", { size: 16 })}<span>回到算帳</span>`;
 
   editBtn.addEventListener("click", () => {
     if (!currentTrip) return;
@@ -364,11 +377,16 @@ function wire() {
     if (ev.key === "Enter") submitNewItem();
   });
 
-  paneSwitch.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pane = btn.dataset.pane;
-      renderPaneVisibility();
-    });
+  packingEntry.addEventListener("click", () => {
+    pane = "list";
+    renderPaneVisibility();
+    window.scrollTo({ top: 0 });
+  });
+
+  backToMoney.addEventListener("click", () => {
+    pane = "money";
+    renderPaneVisibility();
+    window.scrollTo({ top: 0 });
   });
 
   groupSwitch.querySelectorAll("button").forEach((btn) => {

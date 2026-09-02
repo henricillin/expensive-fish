@@ -1,4 +1,4 @@
-const CACHE_VERSION = "expense-tracker-v7";
+const CACHE_VERSION = "expense-tracker-v9";
 
 const PRECACHE_URLS = [
   "./",

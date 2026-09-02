@@ -17,6 +17,22 @@ export function colorForIndex(i) {
 
 const instances = new Map();
 
+/* Chart.js 的預設字色／格線是給淺底用的深灰，在深夜主題上幾乎看不見。
+   一次把預設值換成 CSS 變數的值，兩張圖都吃得到。 */
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+let defaultsApplied = false;
+
+function applyChartDefaults() {
+  if (defaultsApplied || typeof Chart === "undefined") return;
+  defaultsApplied = true;
+  Chart.defaults.color = cssVar("--color-text-muted");
+  Chart.defaults.borderColor = cssVar("--color-border");
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+}
+
 function destroyIfExists(canvas) {
   const existing = instances.get(canvas);
   if (existing) {
@@ -26,6 +42,7 @@ function destroyIfExists(canvas) {
 }
 
 export function renderCategoryPieChart(canvas, entries) {
+  applyChartDefaults();
   destroyIfExists(canvas);
   if (!entries.length) return null;
   const chart = new Chart(canvas, {
@@ -36,7 +53,9 @@ export function renderCategoryPieChart(canvas, entries) {
         {
           data: entries.map((e) => e.amount),
           backgroundColor: entries.map((e) => e.color),
-          borderWidth: 0,
+          /* 深底上相鄰的兩塊色會黏在一起，用底色描一圈當間隙 */
+          borderColor: cssVar("--color-surface"),
+          borderWidth: 2,
         },
       ],
     },
@@ -59,6 +78,7 @@ export function renderCategoryPieChart(canvas, entries) {
 }
 
 export function renderTrendChart(canvas, points) {
+  applyChartDefaults();
   destroyIfExists(canvas);
   const chart = new Chart(canvas, {
     type: "bar",
@@ -85,7 +105,12 @@ export function renderTrendChart(canvas, points) {
         },
       },
       scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } },
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { color: cssVar("--color-border") },
+        },
       },
     },
   });

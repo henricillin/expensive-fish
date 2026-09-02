@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>記帳小幫手</title>
-<meta name="theme-color" content="#faf8f5" />
+<meta name="theme-color" content="#17131f" />
 <meta name="description" content="簡單的手機記帳 App，記錄支出、依分類整理、查看月消費統計與美食評分" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="stylesheet" href="css/styles.css" />
 <link rel="stylesheet" href="css/components.css" />
 </head>
@@ -28,16 +28,20 @@
   <section id="view-home" class="view">
 
     <div class="card">
-      <div class="amount-input-wrap">
-        <div class="amount-label">金額</div>
-        <input id="home-amount" class="amount-input" type="number" inputmode="decimal" placeholder="0" min="0" step="1" />
+      <!-- 順序：日期 → 種類 → 評分 → 金額 → 備註 -->
+      <div class="date-stepper">
+        <button type="button" class="date-nav" id="home-date-prev" aria-label="前一天"></button>
+        <div class="date-face">
+          <span class="date-text" id="home-date-text"></span>
+          <span class="date-rel" id="home-date-rel"></span>
+          <input id="home-date" type="date" aria-label="日期" />
+        </div>
+        <button type="button" class="date-nav" id="home-date-next" aria-label="後一天"></button>
       </div>
-      <div class="card-row" style="margin-bottom:4px;">
-        <button type="button" class="btn btn-ghost accent" id="home-split-toggle">與人分帳</button>
-        <span id="home-split-summary" style="font-size:12px;color:var(--color-text-muted);"></span>
-      </div>
+
       <div class="category-grid" id="home-category-grid"></div>
 
+      <!-- 只有 ratable 的分類（食物、飲料）選到時才會顯示 -->
       <div class="rating-box" id="home-rating-box" hidden>
         <div class="rating-head">
           <span>好吃嗎？給個評分（選填）</span>
@@ -46,12 +50,15 @@
         <div id="home-rating-stars"></div>
       </div>
 
-      <div class="field-row">
-        <div class="field">
-          <label for="home-date">日期</label>
-          <input id="home-date" type="date" />
-        </div>
+      <div class="amount-input-wrap">
+        <div class="amount-label">金額</div>
+        <input id="home-amount" class="amount-input" type="number" inputmode="decimal" placeholder="0" min="0" step="1" />
       </div>
+      <div class="card-row" style="margin-bottom:4px;">
+        <button type="button" class="btn btn-ghost accent" id="home-split-toggle">與人分帳</button>
+        <span id="home-split-summary" style="font-size:12px;color:var(--color-text-muted);"></span>
+      </div>
+
       <div class="field">
         <label for="home-note">備註（選填）</label>
         <input id="home-note" type="text" placeholder="店名、品項…" maxlength="60" />
@@ -230,12 +237,28 @@
       </div>
     </div>
 
-    <div class="segmented" id="trip-pane-switch">
-      <button type="button" class="selected" data-pane="list">攜帶清單</button>
-      <button type="button" data-pane="money">算帳</button>
+    <div id="trip-pane-money">
+      <div class="card-row" style="margin-bottom:12px;">
+        <span class="section-title" style="margin:0;">這趟的花費</span>
+        <button class="btn btn-ghost accent" id="trip-add-expense"></button>
+      </div>
+      <div id="trip-money-body"></div>
+
+      <!-- 攜帶清單退到一列入口，點進去才展開 -->
+      <button type="button" class="packing-entry" id="trip-packing-entry">
+        <span class="packing-entry-icon" id="trip-packing-entry-icon"></span>
+        <span class="packing-entry-meta">
+          <span class="packing-entry-name">攜帶清單</span>
+          <span class="packing-entry-sub" id="trip-packing-entry-sub"></span>
+        </span>
+        <span class="packing-entry-arrow" id="trip-packing-entry-arrow"></span>
+        <span class="packing-entry-track"><span class="packing-entry-fill" id="trip-packing-entry-fill"></span></span>
+      </button>
     </div>
 
-    <div id="trip-pane-list">
+    <div id="trip-pane-list" hidden>
+      <button type="button" class="pane-back" id="trip-back-to-money"></button>
+
       <div class="card">
         <div class="progress-track"><div class="progress-fill" id="trip-progress"></div></div>
         <div class="card-row" style="margin-top:6px;font-size:13px;color:var(--color-text-muted);">
@@ -261,13 +284,6 @@
       </div>
     </div>
 
-    <div id="trip-pane-money" hidden>
-      <div class="card-row" style="margin-bottom:12px;">
-        <span class="section-title" style="margin:0;">這趟的花費</span>
-        <button class="btn btn-ghost accent" id="trip-add-expense"></button>
-      </div>
-      <div id="trip-money-body"></div>
-    </div>
   </section>
 
   <nav class="tabbar" id="tabbar"></nav>
