@@ -1478,3 +1478,60 @@
   font-weight: 500;
   color: var(--color-text-muted);
 }
+
+/* ---- 雲端同步狀態 ---- */
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* 狀態燈：綠＝同步完、黃＝還有東西沒上去、紅＝出錯、閃爍＝正在同步。
+   顏色以外還有文字說明，色弱的人不會只剩下一顆點可以看。 */
+.sync-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-dim);
+}
+
+.sync-dot.ok { background: var(--color-safe); }
+.sync-dot.pending { background: var(--color-warn); }
+.sync-dot.error { background: var(--color-danger); }
+.sync-dot.busy {
+  background: var(--color-accent);
+  animation: sync-pulse 1s ease-in-out infinite;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-dot.busy { animation: none; }
+}
+
+.sync-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sync-account {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-detail {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.sync-detail.error { color: var(--color-danger); }

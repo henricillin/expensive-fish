@@ -1,8 +1,9 @@
 import { seedDefaultCategoriesIfEmpty, migrateCategories } from "./categories.js";
-import { registerRoute, startRouter } from "./router.js";
+import { registerRoute, refreshCurrentView, startRouter } from "./router.js";
 import { refreshBadgeOnly } from "./summary.js";
 import { icon } from "./icons.js";
 import { showToast } from "./ui.js";
+import { startAutoSync } from "./sync.js";
 import * as home from "./views/home.js";
 import * as records from "./views/records.js";
 import * as ratings from "./views/ratings.js";
@@ -69,6 +70,14 @@ async function init() {
 
   startRouter();
   refreshBadgeOnly();
+
+  /* 同步拉回東西時，使用者正在看的那一頁要跟著換掉——
+     不然剛在別台手機記的帳，這裡要切頁再切回來才看得到。 */
+  window.addEventListener("sync:applied", async () => {
+    await refreshCurrentView();
+    refreshBadgeOnly();
+  });
+  startAutoSync();
 
   if ("serviceWorker" in navigator) {
     const register = () => {

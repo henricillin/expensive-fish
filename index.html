@@ -183,6 +183,45 @@
     </div>
 
     <div class="settings-section">
+      <div class="section-title" style="margin-top:0">雲端同步</div>
+      <div class="card">
+        <div id="sync-signed-out">
+          <p class="settings-desc">
+            登入自己架的同步伺服器之後，記帳資料會自動備份到雲端，換手機或清掉瀏覽器資料都不會不見。
+          </p>
+          <div class="field">
+            <label for="sync-url">伺服器網址</label>
+            <input id="sync-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://localhost:8787" />
+          </div>
+          <div class="field">
+            <label for="sync-email">Email</label>
+            <input id="sync-email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="sync-password">密碼</label>
+            <input id="sync-password" type="password" autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary btn-block" id="sync-login">登入並開始同步</button>
+          <button class="btn btn-ghost btn-block" id="sync-register" style="margin-top:8px;">在這台伺服器註冊新帳號</button>
+        </div>
+
+        <div id="sync-signed-in" hidden>
+          <div class="sync-status">
+            <span class="sync-dot" id="sync-dot"></span>
+            <div class="sync-status-text">
+              <span class="sync-account" id="sync-account"></span>
+              <span class="sync-detail" id="sync-detail"></span>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" id="sync-now">立即同步</button>
+          <button class="btn btn-ghost btn-block" id="sync-logout" style="margin-top:8px;">在這台裝置登出</button>
+          <button class="btn btn-danger btn-block" id="sync-wipe" style="margin-top:8px;">刪掉雲端資料並停用同步</button>
+          <p class="settings-desc" id="sync-receipt-note" style="margin:12px 0 0;"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="section-title" style="margin-top:0">資料備份</div>
       <div class="card">
         <p class="settings-desc">資料只存在這台裝置的瀏覽器裡，建議定期匯出備份，換手機或清除瀏覽器資料前記得先匯出。</p>

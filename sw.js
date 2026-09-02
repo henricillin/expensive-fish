@@ -1,4 +1,4 @@
-const CACHE_VERSION = "expense-tracker-v11";
+const CACHE_VERSION = "expense-tracker-v12";
 
 const PRECACHE_URLS = [
   "./",
@@ -17,6 +17,7 @@ const PRECACHE_URLS = [
   "./js/budgets.js",
   "./js/charts.js",
   "./js/exportImport.js",
+  "./js/sync.js",
   "./js/ui.js",
   "./js/expenseModal.js",
   "./js/categoryModal.js",
@@ -71,6 +72,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+
+  /* 同步 API 是另一個網域、而且每次的答案都不一樣，絕對不能進快取——
+     快取住 /api/sync/pull 之後，同步就會永遠拿到同一批舊變更。
+     非 GET 也一律放行（cache.put 對 POST 本來就會丟例外）。 */
+  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
 
   if (req.mode === "navigate") {
     event.respondWith(
