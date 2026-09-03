@@ -56,9 +56,18 @@ export function userVersion(db) {
   return db.prepare("PRAGMA user_version").get().user_version;
 }
 
-/* 之後改 schema 就往這裡加一個 function，user_version 記住做到哪。
-   （第一版沒有東西要搬，先留著位置。） */
-const MIGRATIONS = [];
+/* 之後改 schema 就往這裡加一個 function，user_version 記住做到哪。 */
+const MIGRATIONS = [
+  /* 1：共享方案。shares / share_members 由 schema.sql 建（IF NOT EXISTS），
+     但 records 早就存在了，欄位要自己補上去。 */
+  (db) => {
+    const columns = db.prepare("PRAGMA table_info(records)").all().map((c) => c.name);
+    if (!columns.includes("share_id")) {
+      db.exec("ALTER TABLE records ADD COLUMN share_id INTEGER REFERENCES shares(id) ON DELETE SET NULL");
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS records_share ON records(share_id, collection, uid)");
+  },
+];
 
 export function migrate(db) {
   for (let i = userVersion(db); i < MIGRATIONS.length; i++) {

@@ -6,6 +6,7 @@ import { showToast, escapeHtml } from "../ui.js";
 import { openCategoryCreator, openCategoryEditor } from "../categoryModal.js";
 import { icon, iconBadge } from "../icons.js";
 import * as sync from "../sync.js";
+import { getShares } from "../shares.js";
 
 export const elementId = "view-more";
 export const title = "更多";
@@ -212,7 +213,13 @@ function wire() {
   importFile.addEventListener("change", async () => {
     const file = importFile.files[0];
     if (!file) return;
-    if (!confirm("匯入將會取代目前手機上所有的記帳資料，確定要繼續嗎？")) {
+    /* 有共享方案時要多講一句：匯入是「用備份取代現在的資料」，
+       備份裡沒有的那些會被當成刪掉，而刪掉會同步到其他成員的手機上。 */
+    const shared = getShares().length;
+    const warning = shared
+      ? `匯入將會取代目前手機上所有的記帳資料。你有 ${shared} 個共享方案，備份檔裡沒有的東西會從其他成員的手機上一起消失。確定要繼續嗎？`
+      : "匯入將會取代目前手機上所有的記帳資料，確定要繼續嗎？";
+    if (!confirm(warning)) {
       importFile.value = "";
       return;
     }

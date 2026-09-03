@@ -933,6 +933,19 @@
   flex-shrink: 0;
 }
 
+/* 分類選單擠在輸入框旁邊，寬度壓住不然長分類名會把輸入框吃掉 */
+.quick-add-category {
+  flex: 0 0 auto;
+  max-width: 104px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 12px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text);
+}
+
 .packing-item {
   display: flex;
   align-items: center;
@@ -1004,6 +1017,55 @@
   background: var(--color-soft);
   border-radius: var(--radius-full);
   padding: 3px 9px;
+}
+
+/* ---- 共享方案 ---- */
+.trips-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.share-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  vertical-align: middle;
+}
+
+.share-code-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.share-code-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.share-code {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  /* 邀請碼要一個字一個字念得出來，等寬字型比較不會看錯 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 分類標籤跟人名標籤同一列，靠外框顏色分辨是哪一種 */
+.person-pill.category-pill {
+  background: transparent;
+  border: 1px solid var(--color-border);
 }
 
 .btn:disabled {

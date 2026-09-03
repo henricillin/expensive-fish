@@ -5,6 +5,8 @@ import { listItems, progressOf } from "../packing.js";
 import { escapeHtml, formatMoney } from "../ui.js";
 import { icon } from "../icons.js";
 import { openTripCreator } from "../tripModal.js";
+import { openJoinShareModal } from "../shareModal.js";
+import { shareForTrip } from "../shares.js";
 import { navigate } from "../router.js";
 import { setCurrentTrip } from "./trip.js";
 
@@ -17,6 +19,7 @@ let archivedOpen = false;
 function els() {
   return {
     addBtn: document.getElementById("trips-add"),
+    joinBtn: document.getElementById("trips-join"),
     list: document.getElementById("trips-container"),
     archivedSection: document.getElementById("trips-archived-section"),
     archivedToggle: document.getElementById("trips-archived-toggle"),
@@ -39,9 +42,12 @@ async function tripCard(trip, { archived = false } = {}) {
   const { total, done } = progressOf(items);
   const pct = total ? Math.round((done / total) * 100) : 0;
   const dates = formatTripDates(trip);
+  const share = shareForTrip(trip.id);
   return `<div class="card trip-card${archived ? " archived" : ""}" data-id="${trip.id}">
     <div class="card-row">
-      <span class="packing-card-name">${escapeHtml(trip.name)}</span>
+      <span class="packing-card-name">${escapeHtml(trip.name)}${
+        share ? `<span class="share-mark">${icon("users", { size: 13 })}共享</span>` : ""
+      }</span>
       <span class="packing-card-count">${dates || `${members.options.length} 人`}</span>
     </div>
     <div class="pill-row">
@@ -107,8 +113,19 @@ async function render() {
 function wire() {
   if (wired) return;
   wired = true;
-  const { addBtn, archivedToggle } = els();
+  const { addBtn, joinBtn, archivedToggle } = els();
   addBtn.innerHTML = `${icon("plus", { size: 16 })}<span>新增方案</span>`;
+  joinBtn.innerHTML = `${icon("users", { size: 16 })}<span>加入共享</span>`;
+  joinBtn.addEventListener("click", () => {
+    openJoinShareModal((tripUid) => {
+      if (tripUid) {
+        setCurrentTrip(tripUid);
+        navigate("/trip");
+      } else {
+        render();
+      }
+    });
+  });
   addBtn.addEventListener("click", () => {
     openTripCreator((created) => {
       if (created) {

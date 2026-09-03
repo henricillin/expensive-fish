@@ -73,3 +73,17 @@ export const COLLECTIONS = Object.freeze([
 ]);
 
 export const COLLECTION_SET = new Set(COLLECTIONS);
+
+/* 共享方案會帶著走的資料，以及「這筆屬於哪個方案」寫在 payload 的哪個欄位。
+   trips 是方案本身，它的 uid 就是方案 id，所以值是 null。
+   不在這張表上的東西（分類、同伴、預算、一般結清）永遠只屬於自己的帳號。 */
+export const SHARED_COLLECTIONS = Object.freeze({
+  trips: null,
+  packingItems: "listId",
+  expenses: "tripId",
+  tripSettlements: "tripId",
+});
+
+/* 邀請碼：去掉看起來像的 I/O/0/1。32 個字剛好整除 256，取亂數不用擔心偏差。 */
+export const SHARE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const SHARE_CODE_LENGTH = 8;

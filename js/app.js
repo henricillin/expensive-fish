@@ -4,6 +4,7 @@ import { refreshBadgeOnly } from "./summary.js";
 import { icon } from "./icons.js";
 import { showToast } from "./ui.js";
 import { startAutoSync } from "./sync.js";
+import { loadShares } from "./shares.js";
 import * as home from "./views/home.js";
 import * as records from "./views/records.js";
 import * as ratings from "./views/ratings.js";
@@ -55,6 +56,9 @@ async function init() {
   try {
     await seedDefaultCategoriesIfEmpty();
     await migrateCategories();
+    /* 共享方案的名單存在本機，畫面要同步地問「這個方案是不是共享的」，
+       所以在畫第一頁之前就要載進記憶體。 */
+    await loadShares();
   } catch (err) {
     showToast(err.message || "資料庫打不開");
     console.error(err);

@@ -38,6 +38,29 @@ cd server && npm test
 
 一輪同步固定是「先推再拉」。推上去的每一筆會拿到 `applied` / `stale` / `unchanged`；`stale` 代表伺服器上那份比較新，回應會附上贏的那份讓 client 直接蓋回去。
 
+### 共享方案
+
+一個方案（trip）配一個 share，成員各自用自己的帳號同步同一份資料。伺服器為此多懂兩件事：
+
+1. **哪些資料屬於哪個方案。** 靠 `SHARED_COLLECTIONS`（`src/config.js`）去 payload 裡撈 `tripId` / `listId`，方案本身則是 uid 就等於方案 id。這是伺服器唯一會看 payload 內容的地方。
+2. **誰在這個 share 裡。** 屬於某個 share 的資料寫進來時會**複製給每一位成員**——每人一列、各自的 `version`。共用一列做不到：`version` 是每個使用者自己的流水號，共用的話增量拉取就對不起來。所以 client 端的 pull / push 完全不用改。
+
+幾個細節：
+
+- **定案是「這個 share 裡 `updated_at` 最大的那一列」**，不是推的人自己那一列。不然一台還沒同步到的裝置拿舊資料推上來，就會把別人剛改好的蓋掉。
+- **推一筆屬於別人 share 的資料會整批退 403**（`not_a_member`），不能靠猜 `tripId` 寫進別人的資料。
+- **從方案搬出去也要處理。** 一筆花費的 `tripId` 被拿掉時，推的人那份留著（變回私人的），其他成員那份會收到墓碑——不然那筆會永遠留在他們裝置上而且再也不會更新。
+- **member_id 只是「這個帳號在方案裡是哪一位」**（值就是 client 的 personId），伺服器只負責不讓兩個人認領同一個位子。名字不在這裡，跟著方案的 payload 走。
+
+| 方法 | 路徑 | 說明 |
+| --- | --- | --- |
+| `GET` | `/api/shares` | 我在哪些共享方案裡、我在裡面是誰、還有誰 |
+| `POST` | `/api/shares` | `{ tripUid, memberId }` 開始共享，回邀請碼。之後 client 要把整個方案重推一次（蓋新的 `updatedAt`），伺服器才標得上 `share_id` |
+| `POST` | `/api/shares/join` | `{ code }` 加入，並把方案現有的資料整批複製給他 |
+| `POST` | `/api/shares/:id/claim` | `{ memberId }` 認領「我是哪一位」，重複認領回 409 |
+| `POST` | `/api/shares/:id/leave` | 離開；自己那份轉成墓碑，其他人不動。發起人不能離開 |
+| `DELETE` | `/api/shares/:id` | 解散（限發起人）；其他成員那份轉成墓碑，發起人的留著變回私人方案 |
+
 **收據照片不同步**（`receipts` 不在 `COLLECTIONS` 名單上）。那是 Blob，走 JSON 同步會讓每次請求從幾十 KB 變成幾十 MB。要加的話得另外做二進位上傳的端點，不能塞進現在這條路。
 
 ## API
@@ -86,12 +109,14 @@ cd server && npm test
 
 ```
 src/
-  config.js        設定 + .env 讀取 + 可同步的 collection 白名單
+  config.js        設定 + .env 讀取 + 可同步／可共享的 collection 白名單
   db.js            開資料庫、transaction 包裝、migration
-  schema.sql       users / sessions / records
+  schema.sql       users / sessions / shares / share_members / records
   auth.js          scrypt 密碼、token、requireAuth middleware、節流
-  store.js         同步核心：push / pull / status / wipe
+  shares.js        共享方案：邀請碼、成員、「這筆屬於哪個方案」
+  store.js         同步核心：push / pull / status / wipe + 共享的扇出複製
   routes/auth.js   帳號端點
+  routes/shares.js 共享方案端點
   routes/sync.js   同步端點
   app.js           Express app、CORS、錯誤處理
   server.js        進入點

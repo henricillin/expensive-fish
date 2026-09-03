@@ -23,12 +23,22 @@ import {
   setMeta,
 } from "./db.js";
 import { deleteReceipt } from "./receipts.js";
+import { categoryMap, createCategoryFrom } from "./categories.js";
+import { isSharedTrip, myMemberId, myShareOf, refreshShares, clearShares } from "./shares.js";
+import {
+  DEFAULT_BASE_URL,
+  SyncError,
+  api,
+  clearSession,
+  getConfig,
+  isLinked,
+  normalizeBaseUrl,
+  onUnauthorized,
+  setBaseUrl,
+  setSession,
+} from "./syncApi.js";
 
-export const DEFAULT_BASE_URL = "http://localhost:8787";
-
-const LS_BASE_URL = "sync.baseUrl";
-const LS_TOKEN = "sync.token";
-const LS_EMAIL = "sync.email";
+export { DEFAULT_BASE_URL, SyncError, getConfig, isLinked };
 
 const META_CURSOR = "cursor";
 const META_ACCOUNT = "account";
@@ -43,15 +53,6 @@ const PULL_LIMIT = 300;
 const DEBOUNCE_MS = 3000;
 /* 切回前景時，離上次同步超過這麼久才再同步一次 */
 const REFRESH_AFTER_MS = 60 * 1000;
-
-export class SyncError extends Error {
-  constructor(message, { status, code } = {}) {
-    super(message);
-    this.name = "SyncError";
-    this.status = status;
-    this.code = code;
-  }
-}
 
 let state = { syncing: false, lastError: null, pending: 0, lastSyncAt: 0 };
 const listeners = new Set();
@@ -71,23 +72,6 @@ function emit() {
   }
 }
 
-function normalizeBaseUrl(url) {
-  return String(url || "").trim().replace(/\/+$/, "");
-}
-
-export function getConfig() {
-  return {
-    baseUrl: localStorage.getItem(LS_BASE_URL) || "",
-    token: localStorage.getItem(LS_TOKEN) || "",
-    email: localStorage.getItem(LS_EMAIL) || "",
-  };
-}
-
-export function isLinked() {
-  const { baseUrl, token } = getConfig();
-  return Boolean(baseUrl && token);
-}
-
 export function getState() {
   const { baseUrl, email } = getConfig();
   return { linked: isLinked(), baseUrl, email, ...state };
@@ -100,51 +84,13 @@ export async function refreshPending() {
   return state.pending;
 }
 
-async function api(method, path, { body, auth = true } = {}) {
-  const { baseUrl, token } = getConfig();
-  if (!baseUrl) throw new SyncError("還沒設定伺服器網址");
-
-  let res;
-  try {
-    res = await fetch(baseUrl + path, {
-      method,
-      headers: {
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    /* fetch 只有在連不上時才 reject，訊息本身沒什麼參考價值 */
-    throw new SyncError("連不上伺服器，請確認網址與網路");
-  }
-
-  const text = await res.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    throw new SyncError(`伺服器回了非預期的內容（HTTP ${res.status}）`, { status: res.status });
-  }
-
-  if (!res.ok) {
-    /* token 失效就直接登出，留著只會每次同步都失敗一次 */
-    if (res.status === 401 && auth) unlinkLocal();
-    throw new SyncError(data?.message || `同步失敗（HTTP ${res.status}）`, {
-      status: res.status,
-      code: data?.error,
-    });
-  }
-  return data;
-}
-
 /* ---- 登入／登出 ---- */
 
 export async function link({ baseUrl, email, password, register = false }) {
   const url = normalizeBaseUrl(baseUrl);
   if (!url) throw new SyncError("請輸入伺服器網址");
-  localStorage.setItem(LS_BASE_URL, url);
-  localStorage.removeItem(LS_TOKEN);
+  setBaseUrl(url);
+  clearSession();
 
   const deviceName = describeDevice();
   const data = await api("POST", register ? "/api/auth/register" : "/api/auth/login", {
@@ -152,8 +98,7 @@ export async function link({ baseUrl, email, password, register = false }) {
     body: { email: String(email || "").trim(), password, deviceName },
   });
 
-  localStorage.setItem(LS_TOKEN, data.token);
-  localStorage.setItem(LS_EMAIL, data.user.email);
+  setSession(data.token, data.user.email);
 
   /* 換了帳號（或第一次連）就重來一次：游標歸零、本機資料全部重排上傳，
      並且標記這一輪要「以雲端為準」。 */
@@ -162,6 +107,8 @@ export async function link({ baseUrl, email, password, register = false }) {
     await setMeta(META_ACCOUNT, account);
     await setMeta(META_CURSOR, 0);
     await setMeta(META_ADOPT, true);
+    /* 換帳號就換了一組共享方案，舊的名單留著只會誤判 */
+    await clearShares();
     await clearQueue();
     await enqueueAll();
   }
@@ -173,10 +120,13 @@ export async function link({ baseUrl, email, password, register = false }) {
 
 /* 只清掉這台裝置的登入狀態，本機資料和雲端資料都不動。 */
 export function unlinkLocal() {
-  localStorage.removeItem(LS_TOKEN);
+  clearSession();
   state = { ...state, syncing: false };
   emit();
 }
+
+/* token 失效時 syncApi 會叫這支——留著只會每次同步都失敗一次。 */
+onUnauthorized(unlinkLocal);
 
 export async function unlink() {
   try {
@@ -206,10 +156,24 @@ function describeDevice() {
 /* ---- 推 ---- */
 
 /* 伺服器不需要（也不該拿到）本機的自動編號 id：每台裝置編出來的號碼不一樣，
-   身分一律看 uid。字串主鍵的 store 則相反，id 本身就是 uid，要留著。 */
-function toPayload(collection, record) {
+   身分一律看 uid。字串主鍵的 store 則相反，id 本身就是 uid，要留著。
+
+   共享方案的花費另外夾一份分類的長相：分類是各自帳號的東西，不會同步，
+   對方沒有這個 id 的話整筆會變成「未分類」。 */
+function toPayload(collection, record, cats) {
   const { uid, updatedAt, ...rest } = record;
   if (SYNCABLE_STORES[collection] === "field") delete rest.id;
+  if (collection === "expenses" && rest.tripId && isSharedTrip(rest.tripId)) {
+    const cat = cats?.map[rest.categoryId];
+    if (cat) {
+      rest.categoryMeta = {
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color,
+        ratable: Boolean(cat.ratable),
+      };
+    }
+  }
   return rest;
 }
 
@@ -217,6 +181,7 @@ function toPayload(collection, record) {
    認得出來就不用再套用一次——省掉一次白工，也省掉一次沒必要的畫面重畫。 */
 async function pushPending(justPushed) {
   let pushed = 0;
+  const cats = await categoryMap();
   for (let round = 0; round < 50; round++) {
     const queue = await listQueue();
     if (!queue.length) break;
@@ -248,7 +213,7 @@ async function pushPending(justPushed) {
         uid: entry.uid,
         deleted: false,
         updatedAt: record.updatedAt || entry.updatedAt || Date.now(),
-        payload: toPayload(entry.collection, record),
+        payload: toPayload(entry.collection, record, cats),
       });
       sent.push(entry);
     }
@@ -280,6 +245,25 @@ async function pushPending(justPushed) {
    不然使用者會盯著一份已經過時的月結算。 */
 let appliedCount = 0;
 
+/* 拉回來的共享花費要就地「本機化」：
+   - amount 存的是「我的份」，每個人的答案不一樣，所以照自己的身分重算
+   - 分類是各自帳號的東西，本機沒有的話照著夾帶的長相補一份，
+     不然對方自訂的分類在這裡全都會變成「未分類」 */
+let knownCategoryIds = new Set();
+
+async function localizeExpense(record) {
+  const meta = record.categoryMeta;
+  delete record.categoryMeta;
+  if (!record.tripId || !isSharedTrip(record.tripId)) return record;
+
+  if (meta && record.categoryId && !knownCategoryIds.has(record.categoryId)) {
+    await createCategoryFrom(record.categoryId, meta);
+    knownCategoryIds.add(record.categoryId);
+  }
+  if (!record.split) return record;
+  return { ...record, amount: myShareOf(record.split, myMemberId(record.tripId)) };
+}
+
 async function applyChange(change, { adopt }) {
   const { collection, uid, deleted, updatedAt, payload } = change;
   const mode = SYNCABLE_STORES[collection];
@@ -300,7 +284,8 @@ async function applyChange(change, { adopt }) {
   }
 
   appliedCount++;
-  const record = { ...payload, uid, updatedAt };
+  let record = { ...payload, uid, updatedAt };
+  if (collection === "expenses") record = await localizeExpense(record);
   if (mode === "id") {
     record.id = uid;
     await rawPut(collection, record);
@@ -351,6 +336,15 @@ export async function syncNow() {
   const appliedBefore = appliedCount;
   running = (async () => {
     try {
+      /* 共享方案的名單要先拿到，拉回來的東西才知道哪些屬於共享方案、
+         「我」在裡面又是誰。伺服器太舊沒有這條路徑就當作沒有共享。 */
+      try {
+        await refreshShares();
+      } catch (err) {
+        if (err.status !== 404) throw err;
+      }
+      knownCategoryIds = new Set((await categoryMap()).cats.map((c) => c.id));
+
       /* 第一次連上這個帳號：先把雲端整份拉下來蓋掉本機同名資料，
          再把本機獨有的東西推上去。 */
       let adopted = 0;

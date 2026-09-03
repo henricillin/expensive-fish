@@ -1,6 +1,7 @@
 import express from "express";
 import { COLLECTIONS, config } from "../config.js";
 import { requireAuth } from "../auth.js";
+import { ShareError, createShareStore } from "../shares.js";
 import { ValidationError, createStore } from "../store.js";
 
 const a = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -8,7 +9,7 @@ const a = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(
 export function syncRoutes(db) {
   const router = express.Router();
   const auth = requireAuth(db);
-  const store = createStore(db);
+  const store = createStore(db, createShareStore(db));
 
   router.use(auth);
 
@@ -64,6 +65,10 @@ export function syncRoutes(db) {
   router.use((err, req, res, next) => {
     if (err instanceof ValidationError) {
       return res.status(400).json({ error: "invalid_change", message: err.message, details: err.details });
+    }
+    /* 推了一筆屬於別人共享方案的資料——整批退回，不能寫進別人的資料裡。 */
+    if (err instanceof ShareError) {
+      return res.status(err.status).json({ error: err.code, message: err.message });
     }
     next(err);
   });

@@ -247,7 +247,10 @@
   <section id="view-trips" class="view" hidden>
     <div class="card-row" style="margin-bottom:14px;">
       <span class="section-title" style="margin:0;">我的方案</span>
-      <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
+      <span class="trips-actions">
+        <button class="btn btn-ghost" id="trips-join">加入共享</button>
+        <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
+      </span>
     </div>
     <div id="trips-container"></div>
 
@@ -262,7 +265,10 @@
     <div class="card">
       <div class="card-row">
         <span class="packing-card-name" id="trip-detail-name"></span>
-        <button class="btn btn-ghost accent" id="trip-detail-edit"></button>
+        <span class="trips-actions">
+          <button class="btn btn-ghost" id="trip-detail-share"></button>
+          <button class="btn btn-ghost accent" id="trip-detail-edit"></button>
+        </span>
       </div>
       <div class="trip-dates" id="trip-detail-dates" hidden></div>
       <div class="pill-row" id="trip-detail-members"></div>
@@ -282,6 +288,7 @@
       </div>
     </div>
 
+    <div class="settled-banner" id="trip-claim-banner" hidden></div>
     <div class="settled-banner" id="trip-settled-banner" hidden></div>
 
     <div id="trip-pane-money">
@@ -314,13 +321,15 @@
       </div>
 
       <div class="quick-add-row">
-        <input id="trip-new-item" type="text" placeholder="要帶什麼？打完按 Enter" maxlength="40" />
+        <select id="trip-new-item-category" class="quick-add-category" aria-label="新項目的分類"></select>
+        <input id="trip-new-item" type="text" placeholder="要帶什麼？" maxlength="40" />
         <button class="btn btn-primary" id="trip-add-item" aria-label="新增項目"></button>
       </div>
 
       <div class="segmented" id="trip-group-mode">
         <button type="button" class="selected" data-group="item">依項目</button>
-        <button type="button" data-group="person">依人分組</button>
+        <button type="button" data-group="category">依分類</button>
+        <button type="button" data-group="person">依人</button>
       </div>
 
       <div id="trip-item-list"></div>
@@ -457,7 +466,7 @@
         <input id="trip-end" type="date" />
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="trip-members-field">
       <div class="card-row" style="margin-bottom:6px;">
         <label style="margin:0;">同行的人</label>
         <button type="button" class="btn btn-ghost accent" id="trip-add-person">新增同伴</button>
@@ -465,6 +474,9 @@
       <div class="chip-select" id="trip-members"></div>
       <p class="settings-desc" style="margin:6px 0 0;">你自己一定在方案裡，不用勾。</p>
     </div>
+    <p class="settings-desc" id="trip-shared-note" hidden>
+      這是共享方案，成員在「共享」那邊管理，改了大家都會看到。
+    </p>
     <div class="modal-actions">
       <button class="btn btn-danger" id="trip-delete" hidden>刪除</button>
       <button class="btn btn-primary" id="trip-save">儲存</button>
@@ -567,6 +579,10 @@
       <input id="packing-item-name" type="text" maxlength="40" />
     </div>
     <div class="field">
+      <label for="packing-item-category">分類</label>
+      <select id="packing-item-category"></select>
+    </div>
+    <div class="field">
       <div class="card-row" style="margin-bottom:6px;">
         <label for="packing-item-person" style="margin:0;">誰帶</label>
         <button type="button" class="btn btn-ghost accent" id="packing-item-add-person">管理成員</button>
@@ -582,6 +598,32 @@
       <button class="btn btn-primary" id="packing-item-save">儲存</button>
     </div>
     <button class="btn btn-ghost btn-block" id="packing-item-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Share a trip -->
+<div class="modal-backdrop" id="share-modal" hidden>
+  <div class="modal-sheet">
+    <h2>共享這個方案</h2>
+    <div id="share-modal-body"></div>
+    <button class="btn btn-ghost btn-block" id="share-close" style="margin-top:8px;">關閉</button>
+  </div>
+</div>
+
+<!-- Join a shared trip -->
+<div class="modal-backdrop" id="join-share-modal" hidden>
+  <div class="modal-sheet">
+    <h2>加入共享方案</h2>
+    <div class="field">
+      <label for="join-share-code">邀請碼</label>
+      <input id="join-share-code" type="text" maxlength="12" autocapitalize="characters"
+        autocomplete="off" placeholder="例如 K7PQ2M4X" />
+    </div>
+    <p class="settings-desc">跟發起人要邀請碼。加進來之後要先選「你是名單上的哪一位」，才算得出你的份。</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="join-share-submit">加入</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="join-share-cancel" style="margin-top:8px;">取消</button>
   </div>
 </div>
 

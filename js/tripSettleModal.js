@@ -29,8 +29,10 @@ function renderPeopleSelects(fromId, toId) {
   from.innerHTML = options;
   to.innerHTML = options;
   const has = (id) => members.options.some((p) => p.id === id);
-  from.value = has(fromId) ? fromId : ME.id;
-  to.value = has(toId) && toId !== from.value ? toId : members.options.find((p) => p.id !== from.value)?.id || ME.id;
+  /* 共享方案裡「我」是自己認領的成員 id */
+  const meId = members.meId || ME.id;
+  from.value = has(fromId) ? fromId : meId;
+  to.value = has(toId) && toId !== from.value ? toId : members.options.find((p) => p.id !== from.value)?.id || meId;
 }
 
 function wire() {

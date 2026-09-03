@@ -16,8 +16,11 @@ import {
   uncheckAll,
   removeDone,
   progressOf,
+  groupByCategory,
+  listPackingCategories,
   UNASSIGNED,
 } from "../packing.js";
+import { fillCategorySelect, wireCategorySelect } from "../packingCategoryField.js";
 import { categoryMap } from "../categories.js";
 import { escapeHtml, showToast, formatMoney } from "../ui.js";
 import { icon, iconBadge } from "../icons.js";
@@ -25,6 +28,8 @@ import { openTripEditor } from "../tripModal.js";
 import { openPackingItemEditor } from "../packingItemModal.js";
 import { openTripExpenseModal } from "../tripExpenseModal.js";
 import { openTripSettleModal } from "../tripSettleModal.js";
+import { openShareModal } from "../shareModal.js";
+import { shareForTrip } from "../shares.js";
 import { navigate } from "../router.js";
 
 export const elementId = "view-trip";
@@ -48,6 +53,8 @@ function els() {
     dates: document.getElementById("trip-detail-dates"),
     members: document.getElementById("trip-detail-members"),
     editBtn: document.getElementById("trip-detail-edit"),
+    shareBtn: document.getElementById("trip-detail-share"),
+    claimBanner: document.getElementById("trip-claim-banner"),
     statTotal: document.getElementById("trip-stat-total"),
     statMine: document.getElementById("trip-stat-mine"),
     statNet: document.getElementById("trip-stat-net"),
@@ -63,6 +70,7 @@ function els() {
     progress: document.getElementById("trip-progress"),
     itemCount: document.getElementById("trip-item-count"),
     input: document.getElementById("trip-new-item"),
+    newItemCategory: document.getElementById("trip-new-item-category"),
     addItemBtn: document.getElementById("trip-add-item"),
     groupSwitch: document.getElementById("trip-group-mode"),
     itemList: document.getElementById("trip-item-list"),
@@ -76,7 +84,7 @@ function els() {
 
 /* ---- 攜帶清單 ---- */
 
-function itemRow(item, personName) {
+function itemRow(item, personName, categoryName) {
   return `<div class="packing-item${item.done ? " done" : ""}" data-id="${item.id}">
     <button type="button" class="packing-check${item.done ? " checked" : ""}" data-id="${item.id}"
       aria-label="${item.done ? "取消勾選" : "標記已準備"}">${icon("check", { size: 15 })}</button>
@@ -84,8 +92,20 @@ function itemRow(item, personName) {
       <div class="name">${escapeHtml(item.name)}</div>
       ${item.note ? `<div class="sub">${escapeHtml(item.note)}</div>` : ""}
     </div>
+    ${categoryName ? `<span class="person-pill category-pill">${escapeHtml(categoryName)}</span>` : ""}
     ${personName ? `<span class="person-pill">${escapeHtml(personName)}</span>` : ""}
   </div>`;
+}
+
+/* 分類分組時項目上就不再掛分類標籤了——標題已經寫著同一個名字。 */
+function categoryGroupedHtml(items, categories) {
+  let html = "";
+  for (const [label, group] of groupByCategory(items, categories)) {
+    const { done, total } = progressOf(group);
+    html += `<div class="day-group-label">${escapeHtml(label)} ${done}/${total}</div>`;
+    html += `<div class="card">${group.map((i) => itemRow(i, "", "")).join("")}</div>`;
+  }
+  return html;
 }
 
 function groupedHtml(items, members) {
@@ -102,14 +122,17 @@ function groupedHtml(items, members) {
     const { done, total } = progressOf(group);
     const label = id === UNASSIGNED.id ? UNASSIGNED.name : members.get(id).name;
     html += `<div class="day-group-label">${escapeHtml(label)} ${done}/${total}</div>`;
-    html += `<div class="card">${group.map((i) => itemRow(i, "")).join("")}</div>`;
+    html += `<div class="card">${group.map((i) => itemRow(i, "", i.category || "")).join("")}</div>`;
   }
   return html;
 }
 
 async function renderPacking(members) {
-  const { progress, itemCount, itemList, clearDoneBtn, uncheckAllBtn, entrySub, entryFill } = els();
+  const { progress, itemCount, itemList, clearDoneBtn, uncheckAllBtn, entrySub, entryFill, newItemCategory } =
+    els();
   const items = await listItems(currentTripId);
+  /* 選單每次都重填，剛加的分類才會出現；帶著現在選的值進去就不會被重設 */
+  await fillCategorySelect(newItemCategory, newItemCategory.value);
   const { total, done } = progressOf(items);
   const pct = total ? Math.round((done / total) * 100) : 0;
 
@@ -133,10 +156,12 @@ async function renderPacking(members) {
 
   if (groupMode === "person") {
     itemList.innerHTML = groupedHtml(items, members);
+  } else if (groupMode === "category") {
+    itemList.innerHTML = categoryGroupedHtml(items, await listPackingCategories());
   } else {
     const ordered = [...items.filter((i) => !i.done), ...items.filter((i) => i.done)];
     itemList.innerHTML = `<div class="card">${ordered
-      .map((i) => itemRow(i, i.personId ? members.get(i.personId).name : ""))
+      .map((i) => itemRow(i, i.personId ? members.get(i.personId).name : "", i.category || ""))
       .join("")}</div>`;
   }
 
@@ -294,7 +319,12 @@ const dismissed = new Set();
 
 function renderSettledBanner(acc) {
   const { settledBanner } = els();
-  const show = isTripSettled(acc) && !currentTrip.archivedAt && !dismissed.has(currentTrip.id);
+  const share = shareForTrip(currentTrip.id);
+  const show =
+    isTripSettled(acc) &&
+    !currentTrip.archivedAt &&
+    !dismissed.has(currentTrip.id) &&
+    !(share && !share.myMemberId);
   settledBanner.hidden = !show;
   if (!show) return;
 
@@ -317,6 +347,27 @@ function renderSettledBanner(acc) {
     await setTripArchived(currentTrip.id, true);
     showToast("已收起來，在方案列表最下面找得到");
     navigate("/trips");
+  });
+}
+
+/* 共享方案但還沒選「我是誰」：在算得出「我的份」之前，先擋在這裡問。 */
+function renderClaimBanner(share) {
+  const { claimBanner } = els();
+  const show = Boolean(share && !share.myMemberId);
+  claimBanner.hidden = !show;
+  if (!show) return;
+
+  claimBanner.innerHTML = `
+    <div class="settled-text">
+      ${icon("users", { size: 16 })}
+      <span>這是共享方案。先選「你是名單上的哪一位」，你的份才算得出來。</span>
+    </div>
+    <div class="settled-actions">
+      <button type="button" class="btn btn-primary" id="trip-claim-open">選一個</button>
+    </div>`;
+
+  claimBanner.querySelector("#trip-claim-open").addEventListener("click", () => {
+    openShareModal(currentTripId, () => render());
   });
 }
 
@@ -356,7 +407,12 @@ async function render() {
   statNetLabel.textContent =
     acc.myNet > 0 ? "別人要還我" : acc.myNet < 0 ? "我要還別人" : "已結清";
 
+  const share = shareForTrip(trip.id);
+  els().shareBtn.innerHTML = `${icon("users", { size: 16 })}<span>${share ? "共享中" : "共享"}</span>`;
+  els().shareBtn.classList.toggle("accent", Boolean(share));
+
   renderPaneVisibility();
+  renderClaimBanner(share);
   renderSettledBanner(acc);
   await renderPacking(members);
   await renderMoney(acc);
@@ -369,11 +425,12 @@ function renderPaneVisibility() {
 }
 
 async function submitNewItem() {
-  const { input } = els();
+  const { input, newItemCategory } = els();
   const value = input.value.trim();
   if (!value) return;
   try {
-    await addItem(currentTripId, value);
+    /* 分類留在選單上不清掉：連續加同一類的東西時不用每次重選 */
+    await addItem(currentTripId, value, newItemCategory.value);
     input.value = "";
     await render();
   } catch (err) {
@@ -387,8 +444,10 @@ function wire() {
   wired = true;
   const {
     editBtn,
+    shareBtn,
     addItemBtn,
     input,
+    newItemCategory,
     packingEntry,
     entryIcon,
     entryArrow,
@@ -406,6 +465,14 @@ function wire() {
   entryArrow.innerHTML = icon("chevronRight", { size: 16 });
   backToMoney.innerHTML = `${icon("chevronLeft", { size: 16 })}<span>回到算帳</span>`;
 
+  shareBtn.addEventListener("click", () => {
+    if (!currentTripId) return;
+    openShareModal(currentTripId, (result) => {
+      if (result?.gone) navigate("/trips");
+      else render();
+    });
+  });
+
   editBtn.addEventListener("click", () => {
     if (!currentTrip) return;
     openTripEditor(currentTrip, (updated, opts) => {
@@ -418,6 +485,8 @@ function wire() {
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") submitNewItem();
   });
+
+  wireCategorySelect(newItemCategory);
 
   packingEntry.addEventListener("click", () => {
     pane = "list";

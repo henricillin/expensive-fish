@@ -2,6 +2,7 @@ import express from "express";
 import { COLLECTIONS, config } from "./config.js";
 import { deleteExpiredSessions } from "./auth.js";
 import { authRoutes } from "./routes/auth.js";
+import { shareRoutes } from "./routes/shares.js";
 import { syncRoutes, syncLimits } from "./routes/sync.js";
 
 /* 只有幾個固定來源要放行，用不到 cors 套件。 */
@@ -35,10 +36,13 @@ export function createApp(db) {
       collections: COLLECTIONS,
       limits: syncLimits,
       registrationOpen: !config.disableRegistration,
+      /* client 靠這個判斷伺服器版本夠不夠新，舊的就不顯示共享功能 */
+      sharing: true,
     });
   });
 
   app.use("/api/auth", authRoutes(db));
+  app.use("/api/shares", shareRoutes(db));
   app.use("/api/sync", syncRoutes(db));
 
   app.use((req, res) => {

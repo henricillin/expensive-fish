@@ -1,4 +1,5 @@
 import { updateItem, deleteItem, UNASSIGNED } from "./packing.js";
+import { fillCategorySelect, wireCategorySelect } from "./packingCategoryField.js";
 import { tripMembers } from "./trips.js";
 import { openTripEditor } from "./tripModal.js";
 import { openModal, closeModal, showToast, escapeHtml } from "./ui.js";
@@ -11,6 +12,7 @@ let wired = false;
 function els() {
   return {
     name: document.getElementById("packing-item-name"),
+    category: document.getElementById("packing-item-category"),
     person: document.getElementById("packing-item-person"),
     note: document.getElementById("packing-item-note"),
     addPerson: document.getElementById("packing-item-add-person"),
@@ -32,13 +34,16 @@ async function renderPersonSelect(selectedId) {
 function wire() {
   if (wired) return;
   wired = true;
-  const { save, del, cancel, addPerson } = els();
+  const { save, del, cancel, addPerson, category } = els();
+
+  wireCategorySelect(category);
 
   save.addEventListener("click", async () => {
-    const { name, person, note } = els();
+    const { name, person, note, category: cat } = els();
     try {
       await updateItem(editingItem.id, {
         name: name.value,
+        category: cat.value,
         personId: person.value,
         note: note.value.trim(),
       });
@@ -80,9 +85,10 @@ export async function openPackingItemEditor(item, trip, onDone) {
   editingItem = item;
   currentTrip = trip;
   onDoneCallback = onDone;
-  const { name, note } = els();
+  const { name, note, category } = els();
   name.value = item.name;
   note.value = item.note || "";
+  await fillCategorySelect(category, item.category || "");
   await renderPersonSelect(item.personId || "");
   openModal("packing-item-modal");
 }
