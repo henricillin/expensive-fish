@@ -6,6 +6,7 @@ import { openSplitModal } from "../splitModal.js";
 import { icon, iconBadge } from "../icons.js";
 import { starsInput, wireStars, getStars, starsStatic, RATING_LABELS } from "../rating.js";
 import { initSummary, renderSummary } from "../summary.js";
+import { DEFAULT_CURRENCY, currencyOptionsHtml, currencyTag } from "../currencies.js";
 
 export const elementId = "view-home";
 export const title = "記一筆";
@@ -18,6 +19,7 @@ let wired = false;
 function els() {
   return {
     amount: document.getElementById("home-amount"),
+    currency: document.getElementById("home-currency"),
     splitToggle: document.getElementById("home-split-toggle"),
     splitSummary: document.getElementById("home-split-summary"),
     grid: document.getElementById("home-category-grid"),
@@ -163,7 +165,7 @@ async function renderRecent() {
           <div class="name">${escapeHtml(e.note || c.name)}</div>
           <div class="sub">${e.date}${e.note ? " · " + escapeHtml(c.name) : ""} ${starsStatic(e.rating, { size: 12 })}</div>
         </div>
-        <div class="amount">${formatMoney(e.amount)}</div>
+        <div class="amount">${formatMoney(e.amount)}${currencyTag(e.currency)}</div>
       </div>`;
     })
     .join("");
@@ -178,7 +180,9 @@ async function renderRecent() {
 function wireForm() {
   if (wired) return;
   wired = true;
-  const { amount, date, note, save, splitToggle, datePrev, dateNext } = els();
+  const { amount, currency, date, note, save, splitToggle, datePrev, dateNext } = els();
+
+  currency.innerHTML = currencyOptionsHtml(DEFAULT_CURRENCY);
 
   datePrev.innerHTML = icon("chevronLeft", { size: 18 });
   dateNext.innerHTML = icon("chevronRight", { size: 18 });
@@ -220,6 +224,7 @@ function wireForm() {
     }
     await createExpense({
       amount: amt,
+      currency: currency.value,
       categoryId: selectedCategoryId,
       date: date.value || todayISO(),
       note: note.value,
@@ -237,6 +242,7 @@ function wireForm() {
         : null,
     });
     amount.value = "";
+    currency.value = DEFAULT_CURRENCY;
     note.value = "";
     currentSplit = null;
     renderSplitSummary();

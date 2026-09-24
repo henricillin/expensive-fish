@@ -2,7 +2,7 @@
    拆出來是因為 sync.js（資料同步）和 shares.js（共享方案）都要用，
    兩邊互相 import 會繞成一圈。 */
 
-export const DEFAULT_BASE_URL = "http://localhost:8787";
+export const DEFAULT_BASE_URL = "https://laptop-t9tbuffc.tail8d30be.ts.net";
 
 const LS_BASE_URL = "sync.baseUrl";
 const LS_TOKEN = "sync.token";

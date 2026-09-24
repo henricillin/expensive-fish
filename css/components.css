@@ -161,6 +161,32 @@
   color: var(--color-dim);
 }
 
+.currency-pill {
+  display: block;
+  margin: 6px auto 0;
+  width: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  text-align: center;
+}
+
+/* 幣別標籤：跟在金額旁邊，純提示用，不影響任何計算 */
+.currency-tag {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
 /* 分類選擇器：一排圓形圖示，橫向捲動。負 margin 讓它捲到卡片邊緣，
    最後一個分類才不會看起來像被切掉。 */
 .category-grid {
@@ -1017,6 +1043,17 @@
   background: var(--color-soft);
   border-radius: var(--radius-full);
   padding: 3px 9px;
+}
+
+/* 同一個人在整個方案頁裡都用同一個顏色的小圓點，一眼認出誰是誰 */
+.person-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 /* ---- 共享方案 ---- */

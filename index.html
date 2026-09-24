@@ -53,6 +53,7 @@
       <div class="amount-input-wrap">
         <div class="amount-label">金額</div>
         <input id="home-amount" class="amount-input" type="number" inputmode="decimal" placeholder="0" min="0" step="1" />
+        <select id="home-currency" class="currency-pill" aria-label="幣別"></select>
       </div>
       <div class="card-row" style="margin-bottom:4px;">
         <button type="button" class="btn btn-ghost accent" id="home-split-toggle">與人分帳</button>
@@ -350,9 +351,15 @@
   <div class="modal-sheet">
     <h2>編輯記錄</h2>
     <p id="edit-split-note" class="settings-desc" hidden></p>
-    <div class="field">
-      <label for="edit-amount">金額</label>
-      <input id="edit-amount" type="number" inputmode="decimal" min="0" step="1" />
+    <div class="field-row">
+      <div class="field" style="flex:2;">
+        <label for="edit-amount">金額</label>
+        <input id="edit-amount" type="number" inputmode="decimal" min="0" step="1" />
+      </div>
+      <div class="field" style="flex:1;">
+        <label for="edit-currency">幣別</label>
+        <select id="edit-currency"></select>
+      </div>
     </div>
     <div class="field">
       <label for="edit-category">分類</label>
@@ -500,9 +507,15 @@
       <label for="trip-expense-note">項目</label>
       <input id="trip-expense-note" type="text" maxlength="60" placeholder="晚餐、租車、住宿…" />
     </div>
-    <div class="field">
-      <label for="trip-expense-total">總金額</label>
-      <input id="trip-expense-total" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+    <div class="field-row">
+      <div class="field" style="flex:2;">
+        <label for="trip-expense-total">總金額</label>
+        <input id="trip-expense-total" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+      </div>
+      <div class="field" style="flex:1;">
+        <label for="trip-expense-currency">幣別</label>
+        <select id="trip-expense-currency"></select>
+      </div>
     </div>
     <div class="field-row">
       <div class="field">

@@ -13,6 +13,7 @@ import {
   updateShareAmounts,
 } from "./splitUI.js";
 import { mountReceiptField } from "./receiptField.js";
+import { DEFAULT_CURRENCY, currencyOptionsHtml } from "./currencies.js";
 
 let currentTrip = null;
 let editingExpense = null;
@@ -32,6 +33,7 @@ function els() {
     title: document.getElementById("trip-expense-title"),
     note: document.getElementById("trip-expense-note"),
     total: document.getElementById("trip-expense-total"),
+    currency: document.getElementById("trip-expense-currency"),
     category: document.getElementById("trip-expense-category"),
     date: document.getElementById("trip-expense-date"),
     payer: document.getElementById("trip-expense-payer"),
@@ -162,6 +164,7 @@ function wire() {
     };
     const payload = {
       amount: shares[meId] || 0,
+      currency: els().currency.value,
       categoryId: category.value,
       date: date.value || todayISO(),
       note: note.value,
@@ -210,12 +213,13 @@ export async function openTripExpenseModal(trip, expense, onDone) {
   }
   meId = members.meId || ME.id;
 
-  const { title, note, total, date, del, methodBtns } = els();
+  const { title, note, total, currency, date, del, methodBtns } = els();
   if (editingExpense) {
     const split = editingExpense.split;
     title.textContent = "編輯花費";
     note.value = editingExpense.note || "";
     total.value = split ? split.totalAmount : editingExpense.amount;
+    currency.innerHTML = currencyOptionsHtml(editingExpense.currency || DEFAULT_CURRENCY);
     date.value = editingExpense.date;
     selected = new Set(split ? split.shares.map((s) => s.personId) : [meId]);
     customAmounts = split
@@ -229,6 +233,7 @@ export async function openTripExpenseModal(trip, expense, onDone) {
     title.textContent = "新增花費";
     note.value = "";
     total.value = "";
+    currency.innerHTML = currencyOptionsHtml(DEFAULT_CURRENCY);
     date.value = defaultDate(trip);
     selected = new Set(members.ids);
     customAmounts = {};

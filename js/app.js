@@ -84,10 +84,29 @@ async function init() {
   startAutoSync();
 
   if ("serviceWorker" in navigator) {
+    /* 新版 SW 接手時自動重新整理一次，不然畫面上跑的還是舊快取的 JS。
+       第一次安裝時本來就沒有 controller，那次不重整，免得白跳一下。 */
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      location.reload();
+    });
+
     const register = () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => {
-        console.warn("Service worker registration failed", err);
-      });
+      navigator.serviceWorker
+        .register("sw.js")
+        .then((reg) => {
+          /* iPhone 把 PWA 從背景叫回來不會重新載入頁面，瀏覽器也就不會去檢查 sw.js——
+             所以每次切回前景都主動問一次有沒有新版。 */
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") reg.update().catch(() => {});
+          });
+        })
+        .catch((err) => {
+          console.warn("Service worker registration failed", err);
+        });
     };
     if (document.readyState === "complete") {
       register();

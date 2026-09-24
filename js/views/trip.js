@@ -9,6 +9,8 @@ import {
   setTripArchived,
 } from "../trips.js";
 import { receiptIdSet } from "../receipts.js";
+import { assignPersonColors } from "../people.js";
+import { tint } from "../icons.js";
 import {
   listItems,
   addItem,
@@ -31,6 +33,7 @@ import { openTripSettleModal } from "../tripSettleModal.js";
 import { openShareModal } from "../shareModal.js";
 import { shareForTrip } from "../shares.js";
 import { navigate } from "../router.js";
+import { currencyTag } from "../currencies.js";
 
 export const elementId = "view-trip";
 export const title = "方案";
@@ -41,6 +44,8 @@ let currentTrip = null;
 let pane = "money";
 let groupMode = "item";
 let wired = false;
+/* 這個方案裡每個人固定用哪個顏色——每次 render() 重算一次，同一次渲染裡到處都能用。 */
+let personColors = new Map();
 
 export function setCurrentTrip(id) {
   currentTripId = id;
@@ -84,7 +89,11 @@ function els() {
 
 /* ---- 攜帶清單 ---- */
 
-function itemRow(item, personName, categoryName) {
+function itemRow(item, personName, categoryName, personId) {
+  const color = personId ? personColors.get(personId) : null;
+  const personPill = personName
+    ? `<span class="person-pill"${color ? ` style="background:${tint(color, 0.16)};color:${color};"` : ""}>${escapeHtml(personName)}</span>`
+    : "";
   return `<div class="packing-item${item.done ? " done" : ""}" data-id="${item.id}">
     <button type="button" class="packing-check${item.done ? " checked" : ""}" data-id="${item.id}"
       aria-label="${item.done ? "取消勾選" : "標記已準備"}">${icon("check", { size: 15 })}</button>
@@ -93,7 +102,7 @@ function itemRow(item, personName, categoryName) {
       ${item.note ? `<div class="sub">${escapeHtml(item.note)}</div>` : ""}
     </div>
     ${categoryName ? `<span class="person-pill category-pill">${escapeHtml(categoryName)}</span>` : ""}
-    ${personName ? `<span class="person-pill">${escapeHtml(personName)}</span>` : ""}
+    ${personPill}
   </div>`;
 }
 
@@ -121,7 +130,8 @@ function groupedHtml(items, members) {
     if (!group.length) continue;
     const { done, total } = progressOf(group);
     const label = id === UNASSIGNED.id ? UNASSIGNED.name : members.get(id).name;
-    html += `<div class="day-group-label">${escapeHtml(label)} ${done}/${total}</div>`;
+    const dot = id === UNASSIGNED.id ? "" : `<span class="person-dot" style="background:${personColors.get(id)};"></span>`;
+    html += `<div class="day-group-label">${dot}${escapeHtml(label)} ${done}/${total}</div>`;
     html += `<div class="card">${group.map((i) => itemRow(i, "", i.category || "")).join("")}</div>`;
   }
   return html;
@@ -161,7 +171,7 @@ async function renderPacking(members) {
   } else {
     const ordered = [...items.filter((i) => !i.done), ...items.filter((i) => i.done)];
     itemList.innerHTML = `<div class="card">${ordered
-      .map((i) => itemRow(i, i.personId ? members.get(i.personId).name : "", i.category || ""))
+      .map((i) => itemRow(i, i.personId ? members.get(i.personId).name : "", i.category || "", i.personId))
       .join("")}</div>`;
   }
 
@@ -206,7 +216,7 @@ function expenseListHtml(acc, cats, withReceipt) {
           <div class="name">${escapeHtml(e.note || c.name)}</div>
           <div class="sub">${receiptMark}${e.date} · ${escapeHtml(payer)}先付 · ${count} 人分</div>
         </div>
-        <div class="amount">${formatMoney(total)}<span class="amount-sub">我的份 ${formatMoney(e.amount)}</span></div>
+        <div class="amount">${formatMoney(total)}${currencyTag(e.currency)}<span class="amount-sub">我的份 ${formatMoney(e.amount)}</span></div>
       </div>`;
     })
     .join("");
@@ -225,7 +235,7 @@ function balanceHtml(acc) {
             ? `<span class="owe-label">要付出 ${formatMoney(-r.net)}</span>`
             : `<span style="color:var(--color-text-muted);">已平</span>`;
       return `<div class="balance-row">
-        <span class="name">${escapeHtml(r.name)}</span>
+        <span class="name"><span class="person-dot" style="background:${personColors.get(r.id)};"></span>${escapeHtml(r.name)}</span>
         <span class="sub">付了 ${formatMoney(r.paid)} · 該分 ${formatMoney(r.share)}</span>
         ${label}
       </div>`;
@@ -244,9 +254,9 @@ function transferHtml(acc) {
     .map(
       (t) => `<div class="transfer-row">
         <span class="transfer-text">
-          <strong>${escapeHtml(acc.members.get(t.fromId).name)}</strong>
+          <strong><span class="person-dot" style="background:${personColors.get(t.fromId)};"></span>${escapeHtml(acc.members.get(t.fromId).name)}</strong>
           ${icon("chevronRight", { size: 14 })}
-          <strong>${escapeHtml(acc.members.get(t.toId).name)}</strong>
+          <strong><span class="person-dot" style="background:${personColors.get(t.toId)};"></span>${escapeHtml(acc.members.get(t.toId).name)}</strong>
           <span class="transfer-amount">${formatMoney(t.amount)}</span>
         </span>
         <button type="button" class="btn btn-ghost accent transfer-settle" data-from="${t.fromId}" data-to="${t.toId}" data-amount="${t.amount}">登記結清</button>
@@ -264,7 +274,7 @@ function settlementHtml(acc) {
   const rows = acc.settlements
     .map(
       (s) => `<div class="balance-row">
-        <span class="name">${escapeHtml(acc.members.get(s.fromId).name)} → ${escapeHtml(acc.members.get(s.toId).name)}</span>
+        <span class="name"><span class="person-dot" style="background:${personColors.get(s.fromId)};"></span>${escapeHtml(acc.members.get(s.fromId).name)} → <span class="person-dot" style="background:${personColors.get(s.toId)};"></span>${escapeHtml(acc.members.get(s.toId).name)}</span>
         <span class="sub">${s.date}${s.note ? " · " + escapeHtml(s.note) : ""}</span>
         <span>${formatMoney(s.amount)}</span>
         <button type="button" class="icon-btn settle-delete" data-id="${s.id}" aria-label="刪除結清紀錄">${icon("close", { size: 16 })}</button>
@@ -391,13 +401,17 @@ async function render() {
     tripMembers(trip),
     computeTripAccounts(trip.id, trip),
   ]);
+  personColors = assignPersonColors(acc.rows.map((r) => r.id));
 
   name.textContent = trip.name;
   const range = formatTripDates(trip);
   dates.textContent = range;
   dates.hidden = !range;
   memberBox.innerHTML = members.options
-    .map((p) => `<span class="person-pill">${escapeHtml(p.name)}</span>`)
+    .map((p) => {
+      const color = personColors.get(p.id);
+      return `<span class="person-pill" style="background:${tint(color, 0.16)};color:${color};">${escapeHtml(p.name)}</span>`;
+    })
     .join("");
 
   statTotal.textContent = formatMoney(acc.total);

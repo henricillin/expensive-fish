@@ -1,4 +1,4 @@
-const CACHE_VERSION = "expense-tracker-v14";
+const CACHE_VERSION = "expense-tracker-v15";
 
 const PRECACHE_URLS = [
   "./",
@@ -11,6 +11,7 @@ const PRECACHE_URLS = [
   "./js/db.js",
   "./js/categories.js",
   "./js/expenses.js",
+  "./js/currencies.js",
   "./js/icons.js",
   "./js/rating.js",
   "./js/summary.js",
