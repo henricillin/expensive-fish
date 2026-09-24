@@ -3,6 +3,7 @@ import { updateExpense, deleteExpense } from "./expenses.js";
 import { openModal, closeModal, showToast } from "./ui.js";
 import { starsInput, wireStars, getStars, RATING_LABELS } from "./rating.js";
 import { mountReceiptField } from "./receiptField.js";
+import { DEFAULT_CURRENCY, currencyOptionsHtml } from "./currencies.js";
 
 let onDoneCallback = null;
 let currentId = null;
@@ -13,6 +14,7 @@ let wired = false;
 function els() {
   return {
     amount: document.getElementById("edit-amount"),
+    currency: document.getElementById("edit-currency"),
     category: document.getElementById("edit-category"),
     date: document.getElementById("edit-date"),
     note: document.getElementById("edit-note"),
@@ -64,7 +66,7 @@ function wire() {
   category.addEventListener("change", () => renderRating(currentRating()));
 
   save.addEventListener("click", async () => {
-    const { amount, date, note } = els();
+    const { amount, currency, date, note } = els();
     const amt = Number(amount.value);
     if (!amt || amt <= 0) {
       showToast("請輸入有效金額");
@@ -76,6 +78,7 @@ function wire() {
     }
     await updateExpense(currentId, {
       amount: amt,
+      currency: currency.value,
       categoryId: category.value,
       date: date.value,
       note: note.value,
@@ -102,8 +105,9 @@ export async function openExpenseEditor(expense, onDone) {
   wire();
   onDoneCallback = onDone;
   currentId = expense.id;
-  const { amount, date, note, splitNote } = els();
+  const { amount, currency, date, note, splitNote } = els();
   amount.value = expense.amount;
+  currency.innerHTML = currencyOptionsHtml(expense.currency || DEFAULT_CURRENCY);
   date.value = expense.date;
   note.value = expense.note || "";
   if (expense.split) {

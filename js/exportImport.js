@@ -11,6 +11,7 @@ import {
   clearStore,
   add,
 } from "./db.js";
+import { DEFAULT_CURRENCY } from "./currencies.js";
 
 const SCHEMA_VERSION = 3;
 
@@ -63,13 +64,14 @@ export async function exportCSV() {
     getAll(STORE_CATEGORIES),
   ]);
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c.name]));
-  const rows = [["日期", "分類", "金額", "備註", "評分"]];
+  const rows = [["日期", "分類", "金額", "幣別", "備註", "評分"]];
   const sorted = [...expenses].sort((a, b) => a.date.localeCompare(b.date));
   for (const e of sorted) {
     rows.push([
       e.date,
       catMap[e.categoryId] || e.categoryId,
       e.amount,
+      e.currency || DEFAULT_CURRENCY,
       (e.note || "").replace(/[\r\n,]/g, " "),
       Number(e.rating) || "",
     ]);

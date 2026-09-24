@@ -1,0 +1,19 @@
+{
+  "name": "expense-tracker-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "記帳小幫手的同步後端：帳號 + 多裝置資料同步",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

@@ -93,6 +93,27 @@ export async function createCategory({ name, icon, color, ratable }) {
   return category;
 }
 
+/* 共享方案裡別人用的分類，本機沒有就照著補一份（id 沿用對方的）。
+   不補的話那些花費在這裡全都會變成「未分類」，月結算也歸不了類。
+   已經有同一個 id 就不動——本機自己改過的名字和顏色比較重要。 */
+export async function createCategoryFrom(id, meta) {
+  if (!id || (await getCategory(id))) return null;
+  const all = await listCategories();
+  const maxOrder = all.reduce((m, c) => Math.max(m, c.order ?? 0), -1);
+  const category = {
+    id,
+    name: (meta?.name || "共享分類").slice(0, 20),
+    icon: normalizeIconName(meta?.icon),
+    color: meta?.color || CATEGORY_COLORS[all.length % CATEGORY_COLORS.length],
+    ratable: Boolean(meta?.ratable),
+    isDefault: false,
+    order: maxOrder + 1,
+    createdAt: Date.now(),
+  };
+  await add(STORE_CATEGORIES, category);
+  return category;
+}
+
 export async function updateCategory(id, changes) {
   const existing = await getCategory(id);
   if (!existing) throw new Error("Category not found");

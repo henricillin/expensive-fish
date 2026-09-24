@@ -161,6 +161,32 @@
   color: var(--color-dim);
 }
 
+.currency-pill {
+  display: block;
+  margin: 6px auto 0;
+  width: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  text-align: center;
+}
+
+/* 幣別標籤：跟在金額旁邊，純提示用，不影響任何計算 */
+.currency-tag {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
 /* 分類選擇器：一排圓形圖示，橫向捲動。負 margin 讓它捲到卡片邊緣，
    最後一個分類才不會看起來像被切掉。 */
 .category-grid {
@@ -933,6 +959,19 @@
   flex-shrink: 0;
 }
 
+/* 分類選單擠在輸入框旁邊，寬度壓住不然長分類名會把輸入框吃掉 */
+.quick-add-category {
+  flex: 0 0 auto;
+  max-width: 104px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 12px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text);
+}
+
 .packing-item {
   display: flex;
   align-items: center;
@@ -1004,6 +1043,66 @@
   background: var(--color-soft);
   border-radius: var(--radius-full);
   padding: 3px 9px;
+}
+
+/* 同一個人在整個方案頁裡都用同一個顏色的小圓點，一眼認出誰是誰 */
+.person-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ---- 共享方案 ---- */
+.trips-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.share-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  vertical-align: middle;
+}
+
+.share-code-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.share-code-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.share-code {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  /* 邀請碼要一個字一個字念得出來，等寬字型比較不會看錯 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 分類標籤跟人名標籤同一列，靠外框顏色分辨是哪一種 */
+.person-pill.category-pill {
+  background: transparent;
+  border: 1px solid var(--color-border);
 }
 
 .btn:disabled {
@@ -1478,3 +1577,60 @@
   font-weight: 500;
   color: var(--color-text-muted);
 }
+
+/* ---- 雲端同步狀態 ---- */
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* 狀態燈：綠＝同步完、黃＝還有東西沒上去、紅＝出錯、閃爍＝正在同步。
+   顏色以外還有文字說明，色弱的人不會只剩下一顆點可以看。 */
+.sync-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-dim);
+}
+
+.sync-dot.ok { background: var(--color-safe); }
+.sync-dot.pending { background: var(--color-warn); }
+.sync-dot.error { background: var(--color-danger); }
+.sync-dot.busy {
+  background: var(--color-accent);
+  animation: sync-pulse 1s ease-in-out infinite;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-dot.busy { animation: none; }
+}
+
+.sync-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sync-account {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-detail {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.sync-detail.error { color: var(--color-danger); }

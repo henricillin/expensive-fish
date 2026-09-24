@@ -4,6 +4,7 @@ import { formatMoney, escapeHtml } from "../ui.js";
 import { openExpenseEditor } from "../expenseModal.js";
 import { icon, iconBadge } from "../icons.js";
 import { starsStatic } from "../rating.js";
+import { currencyTag } from "../currencies.js";
 
 export const elementId = "view-records";
 export const title = "消費明細";
@@ -55,7 +56,7 @@ async function renderList() {
           <div class="name">${escapeHtml(e.note || c.name)}</div>
           <div class="sub">${escapeHtml(c.name)} ${starsStatic(e.rating, { size: 12 })}</div>
         </div>
-        <div class="amount">${formatMoney(e.amount)}</div>
+        <div class="amount">${formatMoney(e.amount)}${currencyTag(e.currency)}</div>
       </div>`;
     }
   }

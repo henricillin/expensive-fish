@@ -2,6 +2,7 @@
 import { createTrip, updateTrip, deleteTrip, setTripArchived } from "./trips.js";
 import { listPeople } from "./people.js";
 import { openPersonCreator } from "./personModal.js";
+import { isSharedTrip } from "./shares.js";
 import { openModal, closeModal, showToast, escapeHtml } from "./ui.js";
 
 let mode = "create";
@@ -18,6 +19,8 @@ function els() {
     start: document.getElementById("trip-start"),
     end: document.getElementById("trip-end"),
     members: document.getElementById("trip-members"),
+    membersField: document.getElementById("trip-members-field"),
+    sharedNote: document.getElementById("trip-shared-note"),
     addPerson: document.getElementById("trip-add-person"),
     save: document.getElementById("trip-save"),
     del: document.getElementById("trip-delete"),
@@ -115,7 +118,9 @@ export async function openTripCreator(onDone) {
   editingId = null;
   onDoneCallback = onDone;
   selectedMembers = new Set();
-  const { title, name, start, end, del, archive } = els();
+  const { title, name, start, end, del, archive, membersField, sharedNote } = els();
+  membersField.hidden = false;
+  sharedNote.hidden = true;
   archivedNow = false;
   archive.hidden = true;
   title.textContent = "新增方案";
@@ -134,7 +139,12 @@ export async function openTripEditor(trip, onDone) {
   editingId = trip.id;
   onDoneCallback = onDone;
   selectedMembers = new Set(trip.memberIds || []);
-  const { title, name, start, end, del, archive } = els();
+  const { title, name, start, end, del, archive, membersField, sharedNote } = els();
+  /* 共享方案的成員名單是 roster，跟著資料同步，不是本機勾出來的同伴 */
+  const shared = isSharedTrip(trip.id);
+  membersField.hidden = shared;
+  sharedNote.hidden = !shared;
+  del.hidden = shared;
   archivedNow = Boolean(trip.archivedAt);
   archive.hidden = false;
   archive.textContent = archivedNow ? "重新打開這個方案" : "把這個方案收起來";
@@ -142,7 +152,6 @@ export async function openTripEditor(trip, onDone) {
   name.value = trip.name;
   start.value = trip.startDate || "";
   end.value = trip.endDate || "";
-  del.hidden = false;
   await renderMembers();
   openModal("trip-modal");
 }

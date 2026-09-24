@@ -13,11 +13,14 @@ import {
   updateShareAmounts,
 } from "./splitUI.js";
 import { mountReceiptField } from "./receiptField.js";
+import { DEFAULT_CURRENCY, currencyOptionsHtml } from "./currencies.js";
 
 let currentTrip = null;
 let editingExpense = null;
 let onDoneCallback = null;
-let members = { options: [ME], ids: [ME.id] };
+let members = { options: [ME], ids: [ME.id], meId: ME.id };
+/* 共享方案裡「我」是自己認領的成員 id，不是 me。 */
+let meId = ME.id;
 let selected = new Set([ME.id]);
 let method = "equal";
 let customAmounts = {};
@@ -30,6 +33,7 @@ function els() {
     title: document.getElementById("trip-expense-title"),
     note: document.getElementById("trip-expense-note"),
     total: document.getElementById("trip-expense-total"),
+    currency: document.getElementById("trip-expense-currency"),
     category: document.getElementById("trip-expense-category"),
     date: document.getElementById("trip-expense-date"),
     payer: document.getElementById("trip-expense-payer"),
@@ -58,7 +62,7 @@ function renderPayer(selectedId) {
   payer.innerHTML = members.options
     .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
     .join("");
-  payer.value = members.options.some((p) => p.id === selectedId) ? selectedId : ME.id;
+  payer.value = members.options.some((p) => p.id === selectedId) ? selectedId : meId;
 }
 
 async function renderCategories(selectedId) {
@@ -110,7 +114,7 @@ function renderSummary() {
   if (method === "custom" && sum !== totalAmount) {
     summary.innerHTML = `<span style="color:var(--color-danger)">已分配 ${formatMoney(sum)}，與總額 ${formatMoney(totalAmount)} 不符</span>`;
   } else {
-    summary.innerHTML = `<span>我的份：${formatMoney(shares[ME.id] || 0)}</span><span>${selected.size} 人分</span>`;
+    summary.innerHTML = `<span>我的份：${formatMoney(shares[meId] || 0)}</span><span>${selected.size} 人分</span>`;
   }
 }
 
@@ -159,7 +163,8 @@ function wire() {
       ...splitMethodFields(method, selected, weights),
     };
     const payload = {
-      amount: shares[ME.id] || 0,
+      amount: shares[meId] || 0,
+      currency: els().currency.value,
       categoryId: category.value,
       date: date.value || todayISO(),
       note: note.value,
@@ -201,26 +206,34 @@ export async function openTripExpenseModal(trip, expense, onDone) {
   editingExpense = expense || null;
   onDoneCallback = onDone;
   members = await tripMembers(trip);
+  /* 共享方案還沒選「我是誰」的話算不出我的份，先請使用者去選。 */
+  if (members.share && !members.meId) {
+    showToast("請先在上面選「我是這個方案裡的哪一位」");
+    return;
+  }
+  meId = members.meId || ME.id;
 
-  const { title, note, total, date, del, methodBtns } = els();
+  const { title, note, total, currency, date, del, methodBtns } = els();
   if (editingExpense) {
     const split = editingExpense.split;
     title.textContent = "編輯花費";
     note.value = editingExpense.note || "";
     total.value = split ? split.totalAmount : editingExpense.amount;
+    currency.innerHTML = currencyOptionsHtml(editingExpense.currency || DEFAULT_CURRENCY);
     date.value = editingExpense.date;
-    selected = new Set(split ? split.shares.map((s) => s.personId) : [ME.id]);
+    selected = new Set(split ? split.shares.map((s) => s.personId) : [meId]);
     customAmounts = split
       ? Object.fromEntries(split.shares.map((s) => [s.personId, s.amount]))
       : {};
     ({ method, weights } = restoreSplitMethod(split));
     del.hidden = false;
     await renderCategories(editingExpense.categoryId);
-    renderPayer(split ? split.payerId : ME.id);
+    renderPayer(split ? split.payerId : meId);
   } else {
     title.textContent = "新增花費";
     note.value = "";
     total.value = "";
+    currency.innerHTML = currencyOptionsHtml(DEFAULT_CURRENCY);
     date.value = defaultDate(trip);
     selected = new Set(members.ids);
     customAmounts = {};
@@ -228,7 +241,7 @@ export async function openTripExpenseModal(trip, expense, onDone) {
     method = "equal";
     del.hidden = true;
     await renderCategories(null);
-    renderPayer(ME.id);
+    renderPayer(meId);
   }
 
   methodBtns.forEach((b) => b.classList.toggle("selected", b.dataset.method === method));

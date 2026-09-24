@@ -53,6 +53,7 @@
       <div class="amount-input-wrap">
         <div class="amount-label">金額</div>
         <input id="home-amount" class="amount-input" type="number" inputmode="decimal" placeholder="0" min="0" step="1" />
+        <select id="home-currency" class="currency-pill" aria-label="幣別"></select>
       </div>
       <div class="card-row" style="margin-bottom:4px;">
         <button type="button" class="btn btn-ghost accent" id="home-split-toggle">與人分帳</button>
@@ -183,6 +184,45 @@
     </div>
 
     <div class="settings-section">
+      <div class="section-title" style="margin-top:0">雲端同步</div>
+      <div class="card">
+        <div id="sync-signed-out">
+          <p class="settings-desc">
+            登入自己架的同步伺服器之後，記帳資料會自動備份到雲端，換手機或清掉瀏覽器資料都不會不見。
+          </p>
+          <div class="field">
+            <label for="sync-url">伺服器網址</label>
+            <input id="sync-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://localhost:8787" />
+          </div>
+          <div class="field">
+            <label for="sync-email">Email</label>
+            <input id="sync-email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="sync-password">密碼</label>
+            <input id="sync-password" type="password" autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary btn-block" id="sync-login">登入並開始同步</button>
+          <button class="btn btn-ghost btn-block" id="sync-register" style="margin-top:8px;">在這台伺服器註冊新帳號</button>
+        </div>
+
+        <div id="sync-signed-in" hidden>
+          <div class="sync-status">
+            <span class="sync-dot" id="sync-dot"></span>
+            <div class="sync-status-text">
+              <span class="sync-account" id="sync-account"></span>
+              <span class="sync-detail" id="sync-detail"></span>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" id="sync-now">立即同步</button>
+          <button class="btn btn-ghost btn-block" id="sync-logout" style="margin-top:8px;">在這台裝置登出</button>
+          <button class="btn btn-danger btn-block" id="sync-wipe" style="margin-top:8px;">刪掉雲端資料並停用同步</button>
+          <p class="settings-desc" id="sync-receipt-note" style="margin:12px 0 0;"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="section-title" style="margin-top:0">資料備份</div>
       <div class="card">
         <p class="settings-desc">資料只存在這台裝置的瀏覽器裡，建議定期匯出備份，換手機或清除瀏覽器資料前記得先匯出。</p>
@@ -208,7 +248,10 @@
   <section id="view-trips" class="view" hidden>
     <div class="card-row" style="margin-bottom:14px;">
       <span class="section-title" style="margin:0;">我的方案</span>
-      <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
+      <span class="trips-actions">
+        <button class="btn btn-ghost" id="trips-join">加入共享</button>
+        <button class="btn btn-ghost accent" id="trips-add">新增方案</button>
+      </span>
     </div>
     <div id="trips-container"></div>
 
@@ -223,7 +266,10 @@
     <div class="card">
       <div class="card-row">
         <span class="packing-card-name" id="trip-detail-name"></span>
-        <button class="btn btn-ghost accent" id="trip-detail-edit"></button>
+        <span class="trips-actions">
+          <button class="btn btn-ghost" id="trip-detail-share"></button>
+          <button class="btn btn-ghost accent" id="trip-detail-edit"></button>
+        </span>
       </div>
       <div class="trip-dates" id="trip-detail-dates" hidden></div>
       <div class="pill-row" id="trip-detail-members"></div>
@@ -243,6 +289,7 @@
       </div>
     </div>
 
+    <div class="settled-banner" id="trip-claim-banner" hidden></div>
     <div class="settled-banner" id="trip-settled-banner" hidden></div>
 
     <div id="trip-pane-money">
@@ -275,13 +322,15 @@
       </div>
 
       <div class="quick-add-row">
-        <input id="trip-new-item" type="text" placeholder="要帶什麼？打完按 Enter" maxlength="40" />
+        <select id="trip-new-item-category" class="quick-add-category" aria-label="新項目的分類"></select>
+        <input id="trip-new-item" type="text" placeholder="要帶什麼？" maxlength="40" />
         <button class="btn btn-primary" id="trip-add-item" aria-label="新增項目"></button>
       </div>
 
       <div class="segmented" id="trip-group-mode">
         <button type="button" class="selected" data-group="item">依項目</button>
-        <button type="button" data-group="person">依人分組</button>
+        <button type="button" data-group="category">依分類</button>
+        <button type="button" data-group="person">依人</button>
       </div>
 
       <div id="trip-item-list"></div>
@@ -302,9 +351,15 @@
   <div class="modal-sheet">
     <h2>編輯記錄</h2>
     <p id="edit-split-note" class="settings-desc" hidden></p>
-    <div class="field">
-      <label for="edit-amount">金額</label>
-      <input id="edit-amount" type="number" inputmode="decimal" min="0" step="1" />
+    <div class="field-row">
+      <div class="field" style="flex:2;">
+        <label for="edit-amount">金額</label>
+        <input id="edit-amount" type="number" inputmode="decimal" min="0" step="1" />
+      </div>
+      <div class="field" style="flex:1;">
+        <label for="edit-currency">幣別</label>
+        <select id="edit-currency"></select>
+      </div>
     </div>
     <div class="field">
       <label for="edit-category">分類</label>
@@ -418,7 +473,7 @@
         <input id="trip-end" type="date" />
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="trip-members-field">
       <div class="card-row" style="margin-bottom:6px;">
         <label style="margin:0;">同行的人</label>
         <button type="button" class="btn btn-ghost accent" id="trip-add-person">新增同伴</button>
@@ -426,6 +481,9 @@
       <div class="chip-select" id="trip-members"></div>
       <p class="settings-desc" style="margin:6px 0 0;">你自己一定在方案裡，不用勾。</p>
     </div>
+    <p class="settings-desc" id="trip-shared-note" hidden>
+      這是共享方案，成員在「共享」那邊管理，改了大家都會看到。
+    </p>
     <div class="modal-actions">
       <button class="btn btn-danger" id="trip-delete" hidden>刪除</button>
       <button class="btn btn-primary" id="trip-save">儲存</button>
@@ -449,9 +507,15 @@
       <label for="trip-expense-note">項目</label>
       <input id="trip-expense-note" type="text" maxlength="60" placeholder="晚餐、租車、住宿…" />
     </div>
-    <div class="field">
-      <label for="trip-expense-total">總金額</label>
-      <input id="trip-expense-total" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+    <div class="field-row">
+      <div class="field" style="flex:2;">
+        <label for="trip-expense-total">總金額</label>
+        <input id="trip-expense-total" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+      </div>
+      <div class="field" style="flex:1;">
+        <label for="trip-expense-currency">幣別</label>
+        <select id="trip-expense-currency"></select>
+      </div>
     </div>
     <div class="field-row">
       <div class="field">
@@ -528,6 +592,10 @@
       <input id="packing-item-name" type="text" maxlength="40" />
     </div>
     <div class="field">
+      <label for="packing-item-category">分類</label>
+      <select id="packing-item-category"></select>
+    </div>
+    <div class="field">
       <div class="card-row" style="margin-bottom:6px;">
         <label for="packing-item-person" style="margin:0;">誰帶</label>
         <button type="button" class="btn btn-ghost accent" id="packing-item-add-person">管理成員</button>
@@ -543,6 +611,32 @@
       <button class="btn btn-primary" id="packing-item-save">儲存</button>
     </div>
     <button class="btn btn-ghost btn-block" id="packing-item-cancel" style="margin-top:8px;">取消</button>
+  </div>
+</div>
+
+<!-- Share a trip -->
+<div class="modal-backdrop" id="share-modal" hidden>
+  <div class="modal-sheet">
+    <h2>共享這個方案</h2>
+    <div id="share-modal-body"></div>
+    <button class="btn btn-ghost btn-block" id="share-close" style="margin-top:8px;">關閉</button>
+  </div>
+</div>
+
+<!-- Join a shared trip -->
+<div class="modal-backdrop" id="join-share-modal" hidden>
+  <div class="modal-sheet">
+    <h2>加入共享方案</h2>
+    <div class="field">
+      <label for="join-share-code">邀請碼</label>
+      <input id="join-share-code" type="text" maxlength="12" autocapitalize="characters"
+        autocomplete="off" placeholder="例如 K7PQ2M4X" />
+    </div>
+    <p class="settings-desc">跟發起人要邀請碼。加進來之後要先選「你是名單上的哪一位」，才算得出你的份。</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="join-share-submit">加入</button>
+    </div>
+    <button class="btn btn-ghost btn-block" id="join-share-cancel" style="margin-top:8px;">取消</button>
   </div>
 </div>
 

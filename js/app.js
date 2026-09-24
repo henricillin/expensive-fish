@@ -1,8 +1,10 @@
 import { seedDefaultCategoriesIfEmpty, migrateCategories } from "./categories.js";
-import { registerRoute, startRouter } from "./router.js";
+import { registerRoute, refreshCurrentView, startRouter } from "./router.js";
 import { refreshBadgeOnly } from "./summary.js";
 import { icon } from "./icons.js";
 import { showToast } from "./ui.js";
+import { startAutoSync } from "./sync.js";
+import { loadShares } from "./shares.js";
 import * as home from "./views/home.js";
 import * as records from "./views/records.js";
 import * as ratings from "./views/ratings.js";
@@ -54,6 +56,9 @@ async function init() {
   try {
     await seedDefaultCategoriesIfEmpty();
     await migrateCategories();
+    /* 共享方案的名單存在本機，畫面要同步地問「這個方案是不是共享的」，
+       所以在畫第一頁之前就要載進記憶體。 */
+    await loadShares();
   } catch (err) {
     showToast(err.message || "資料庫打不開");
     console.error(err);
@@ -70,11 +75,38 @@ async function init() {
   startRouter();
   refreshBadgeOnly();
 
+  /* 同步拉回東西時，使用者正在看的那一頁要跟著換掉——
+     不然剛在別台手機記的帳，這裡要切頁再切回來才看得到。 */
+  window.addEventListener("sync:applied", async () => {
+    await refreshCurrentView();
+    refreshBadgeOnly();
+  });
+  startAutoSync();
+
   if ("serviceWorker" in navigator) {
+    /* 新版 SW 接手時自動重新整理一次，不然畫面上跑的還是舊快取的 JS。
+       第一次安裝時本來就沒有 controller，那次不重整，免得白跳一下。 */
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      location.reload();
+    });
+
     const register = () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => {
-        console.warn("Service worker registration failed", err);
-      });
+      navigator.serviceWorker
+        .register("sw.js")
+        .then((reg) => {
+          /* iPhone 把 PWA 從背景叫回來不會重新載入頁面，瀏覽器也就不會去檢查 sw.js——
+             所以每次切回前景都主動問一次有沒有新版。 */
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") reg.update().catch(() => {});
+          });
+        })
+        .catch((err) => {
+          console.warn("Service worker registration failed", err);
+        });
     };
     if (document.readyState === "complete") {
       register();

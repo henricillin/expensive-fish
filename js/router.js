@@ -54,6 +54,13 @@ async function render() {
   }
 }
 
+/* 資料被別的地方換掉時（例如同步剛拉回一批變更）拿來重畫目前這一頁。
+   走 render() 沒有用——path 沒變它會直接 return。 */
+export async function refreshCurrentView() {
+  const view = routes.get(currentPath);
+  if (view && typeof view.onShow === "function") await view.onShow();
+}
+
 export function navigate(path) {
   if (location.hash.replace(/^#/, "") === path) {
     render();

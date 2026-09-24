@@ -8,6 +8,7 @@ import {
   getAllByIndex,
 } from "./db.js";
 import { deleteReceipt } from "./receipts.js";
+import { DEFAULT_CURRENCY } from "./currencies.js";
 
 export function todayISO() {
   const d = new Date();
@@ -54,7 +55,7 @@ export async function getExpense(id) {
   return getById(STORE_EXPENSES, id);
 }
 
-export async function createExpense({ amount, categoryId, date, note, split, rating, tripId }) {
+export async function createExpense({ amount, categoryId, date, note, split, rating, tripId, currency }) {
   const expense = {
     amount: Number(amount),
     categoryId,
@@ -62,6 +63,7 @@ export async function createExpense({ amount, categoryId, date, note, split, rat
     yearMonth: isoToYearMonth(date),
     note: note ? note.trim() : "",
     rating: Number(rating) || 0,
+    currency: currency || DEFAULT_CURRENCY,
     createdAt: Date.now(),
   };
   if (split) expense.split = split;
@@ -77,6 +79,7 @@ export async function updateExpense(id, changes) {
   if (changes.date) updated.yearMonth = isoToYearMonth(changes.date);
   if (changes.amount !== undefined) updated.amount = Number(changes.amount);
   if (changes.rating !== undefined) updated.rating = Number(changes.rating) || 0;
+  if (changes.currency !== undefined) updated.currency = changes.currency || DEFAULT_CURRENCY;
   await put(STORE_EXPENSES, updated);
   return updated;
 }

@@ -1,6 +1,7 @@
 import { STORE_SETTLEMENTS, STORE_TRIP_SETTLEMENTS, getAll, add, remove } from "./db.js";
 import { listExpenses } from "./expenses.js";
 import { ME } from "./people.js";
+import { myMemberId } from "./shares.js";
 
 export async function listSettlements() {
   return getAll(STORE_SETTLEMENTS);
@@ -30,6 +31,8 @@ export async function computeBalances() {
     getAll(STORE_TRIP_SETTLEMENTS),
   ]);
   const balances = new Map();
+  /* 共享方案裡的「我」不是 me，是自己認領的成員 id；其他方案照舊。 */
+  const meIn = (tripId) => (tripId && myMemberId(tripId)) || ME.id;
 
   function ensure(personId) {
     if (!balances.has(personId)) {
@@ -41,15 +44,16 @@ export async function computeBalances() {
   for (const e of expenses) {
     if (!e.split) continue;
     const { payerId, shares } = e.split;
-    if (payerId === ME.id) {
+    const me = meIn(e.tripId);
+    if (payerId === me) {
       for (const s of shares) {
-        if (s.personId === ME.id) continue;
+        if (s.personId === me) continue;
         const b = ensure(s.personId);
         b.owedToMe += s.amount;
         b.related.push({ expenseId: e.id, date: e.date, amount: s.amount, role: "owesMe" });
       }
     } else {
-      const mine = shares.find((s) => s.personId === ME.id);
+      const mine = shares.find((s) => s.personId === me);
       if (mine) {
         const b = ensure(payerId);
         b.owedByMe += mine.amount;
@@ -66,8 +70,9 @@ export async function computeBalances() {
 
   /* 在方案裡登記的結清，只要牽涉到我，就一起沖掉總覽的欠款。 */
   for (const s of tripSettlements) {
-    if (s.toId === ME.id) ensure(s.fromId).owedToMe -= s.amount;
-    else if (s.fromId === ME.id) ensure(s.toId).owedByMe -= s.amount;
+    const me = meIn(s.tripId);
+    if (s.toId === me) ensure(s.fromId).owedToMe -= s.amount;
+    else if (s.fromId === me) ensure(s.toId).owedByMe -= s.amount;
   }
 
   for (const b of balances.values()) {
